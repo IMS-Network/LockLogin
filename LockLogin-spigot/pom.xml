@@ -7,7 +7,7 @@
     <parent>
         <groupId>eu.locklogin</groupId>
         <artifactId>LockLogin</artifactId>
-        <version>1.13.38</version>
+        <version>1.13.39</version>
     </parent>
 
     <artifactId>LockLogin-spigot</artifactId>
@@ -117,6 +117,12 @@
             <groupId>me.clip</groupId>
             <artifactId>placeholderapi</artifactId>
             <version>2.10.9</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.socket</groupId>
+            <artifactId>socket.io-client</artifactId>
+            <version>2.1.0</version>
             <scope>provided</scope>
         </dependency>
     </dependencies>

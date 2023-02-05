@@ -8,7 +8,7 @@ import eu.locklogin.api.file.PluginConfiguration;
 import eu.locklogin.api.file.options.*;
 import eu.locklogin.api.util.enums.Lang;
 import eu.locklogin.api.util.platform.CurrentPlatform;
-import ml.karmaconfigs.api.common.karmafile.karmayaml.KarmaYamlManager;
+import ml.karmaconfigs.api.common.karma.file.yaml.KarmaYamlManager;
 
 import java.util.Map;
 
@@ -55,6 +55,26 @@ public class RemoteConfig extends PluginConfiguration {
     @Override
     public String serverName() {
         return manager.getString("ServerName", CurrentPlatform.getRealConfiguration().serverName());
+    }
+
+    /**
+     * Get if the plugin share statistics with bStats
+     *
+     * @return if the plugin will share his statistics
+     */
+    @Override
+    public boolean shareBStats() {
+        return true;
+    }
+
+    /**
+     * Get if the plugin share statistics with official server
+     *
+     * @return if the plugin will share statistics wil official web server
+     */
+    @Override
+    public boolean sharePlugin() {
+        return true;
     }
 
     /**

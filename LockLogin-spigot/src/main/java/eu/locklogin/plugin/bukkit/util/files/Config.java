@@ -19,15 +19,15 @@ import eu.locklogin.api.file.PluginConfiguration;
 import eu.locklogin.api.file.options.*;
 import eu.locklogin.api.util.enums.Lang;
 import eu.locklogin.api.util.platform.CurrentPlatform;
-import ml.karmaconfigs.api.common.karmafile.karmayaml.FileCopy;
-import ml.karmaconfigs.api.common.karmafile.karmayaml.KarmaYamlManager;
-import ml.karmaconfigs.api.common.karmafile.karmayaml.YamlReloader;
+import ml.karmaconfigs.api.common.data.file.FileUtilities;
+import ml.karmaconfigs.api.common.karma.file.yaml.FileCopy;
+import ml.karmaconfigs.api.common.karma.file.yaml.KarmaYamlManager;
+import ml.karmaconfigs.api.common.karma.file.yaml.YamlReloader;
+import ml.karmaconfigs.api.common.string.StringUtils;
+import ml.karmaconfigs.api.common.string.random.RandomString;
+import ml.karmaconfigs.api.common.string.text.TextContent;
+import ml.karmaconfigs.api.common.string.text.TextType;
 import ml.karmaconfigs.api.common.utils.enums.Level;
-import ml.karmaconfigs.api.common.utils.file.FileUtilities;
-import ml.karmaconfigs.api.common.utils.string.RandomString;
-import ml.karmaconfigs.api.common.utils.string.StringUtils;
-import ml.karmaconfigs.api.common.utils.string.util.TextContent;
-import ml.karmaconfigs.api.common.utils.string.util.TextType;
 import org.bukkit.Bukkit;
 
 import java.io.File;
@@ -110,7 +110,7 @@ public final class Config extends PluginConfiguration {
     public String serverName() {
         String server_name = cfg.getString("ServerName", "");
         if (StringUtils.isNullOrEmpty(server_name)) {
-            server_name = StringUtils.generateString(
+            server_name = new RandomString(
                     RandomString.createBuilder()
                             .withType(TextType.ALL_LOWER)
                             .withContent(TextContent.ONLY_LETTERS)
@@ -127,6 +127,26 @@ public final class Config extends PluginConfiguration {
         }
 
         return server_name;
+    }
+
+    /**
+     * Get if the plugin share statistics with bStats
+     *
+     * @return if the plugin will share his statistics
+     */
+    @Override
+    public boolean shareBStats() {
+        return cfg.getBoolean("Statistics.bStats", true);
+    }
+
+    /**
+     * Get if the plugin share statistics with official server
+     *
+     * @return if the plugin will share statistics wil official web server
+     */
+    @Override
+    public boolean sharePlugin() {
+        return cfg.getBoolean("Statistics.plugin", true);
     }
 
     /**
@@ -148,7 +168,7 @@ public final class Config extends PluginConfiguration {
      */
     @Override
     public String serverKey() {
-        return cfg.getString("ServerKey", CurrentPlatform.getServerHash());
+        return cfg.getString("ServerKey", "");
     }
 
     @Override
@@ -565,7 +585,7 @@ public final class Config extends PluginConfiguration {
             String module_prefix = cfg.getString("ModulePrefix", "$");
 
             if (StringUtils.isNullOrEmpty(server_name)) {
-                server_name = StringUtils.generateString(
+                server_name = new RandomString(
                         RandomString.createBuilder()
                                 .withType(TextType.ALL_LOWER)
                                 .withContent(TextContent.ONLY_LETTERS)

@@ -24,19 +24,19 @@ import eu.locklogin.api.file.ProxyConfiguration;
 import eu.locklogin.api.module.plugin.javamodule.sender.ModulePlayer;
 import eu.locklogin.api.module.plugin.javamodule.server.TargetServer;
 import eu.locklogin.api.util.enums.Manager;
-import ml.karmaconfigs.api.common.Logger;
-import ml.karmaconfigs.api.common.karma.APISource;
-import ml.karmaconfigs.api.common.karma.KarmaSource;
 import ml.karmaconfigs.api.common.karma.file.KarmaMain;
 import ml.karmaconfigs.api.common.karma.file.element.KarmaElement;
 import ml.karmaconfigs.api.common.karma.file.element.KarmaObject;
 import ml.karmaconfigs.api.common.karma.loader.BruteLoader;
-import ml.karmaconfigs.api.common.utils.KarmaLogger;
+import ml.karmaconfigs.api.common.karma.source.APISource;
+import ml.karmaconfigs.api.common.karma.source.KarmaSource;
+import ml.karmaconfigs.api.common.logger.KarmaLogger;
+import ml.karmaconfigs.api.common.logger.Logger;
+import ml.karmaconfigs.api.common.string.StringUtils;
+import ml.karmaconfigs.api.common.string.random.RandomString;
+import ml.karmaconfigs.api.common.string.text.TextContent;
+import ml.karmaconfigs.api.common.string.text.TextType;
 import ml.karmaconfigs.api.common.utils.enums.Level;
-import ml.karmaconfigs.api.common.utils.string.RandomString;
-import ml.karmaconfigs.api.common.utils.string.StringUtils;
-import ml.karmaconfigs.api.common.utils.string.util.TextContent;
-import ml.karmaconfigs.api.common.utils.string.util.TextType;
 import org.jetbrains.annotations.Nullable;
 
 import java.lang.reflect.Constructor;
@@ -68,7 +68,7 @@ public final class CurrentPlatform {
 
             KarmaElement tmp_hash = kf.get("hash");
             if (tmp_hash == null || tmp_hash.isString() && StringUtils.isNullOrEmpty(tmp_hash.getObjet().getString().isEmpty()) || !tmp_hash.isString()) {
-                tmp_hash = new KarmaObject(Base64.getEncoder().encodeToString(new SHA512().hash(StringUtils.generateString(
+                tmp_hash = new KarmaObject(Base64.getEncoder().encodeToString(new SHA512().hash(new RandomString(
                         RandomString.createBuilder()
                                 .withContent(TextContent.NUMBERS_AND_LETTERS)
                                 .withType(TextType.RANDOM_SIZE)
@@ -84,7 +84,7 @@ public final class CurrentPlatform {
             plugin.logger().scheduleLog(Level.GRAVE, ex);
             plugin.logger().scheduleLog(Level.INFO, "Failed to load server hash");
 
-            hash = Base64.getEncoder().encodeToString(new SHA512().hash(StringUtils.generateString(
+            hash = Base64.getEncoder().encodeToString(new SHA512().hash(new RandomString(
                     RandomString.createBuilder()
                             .withContent(TextContent.NUMBERS_AND_LETTERS)
                             .withType(TextType.RANDOM_SIZE)
@@ -106,7 +106,9 @@ public final class CurrentPlatform {
     private static Class<? extends AccountManager> last_manager;
     private static Class<? extends ClientSession> sessionManager;
 
+    @SuppressWarnings("unused")
     private static PluginConfiguration fake_config;
+    @SuppressWarnings("unused")
     private static ProxyConfiguration fake_proxy;
 
     private static PluginConfiguration current_config;
@@ -210,6 +212,7 @@ public final class CurrentPlatform {
      *
      * @param sv the server to add
      */
+    @SuppressWarnings("unused")
     public static void detectServer(final TargetServer sv) {
         server.addServer(sv);
     }
@@ -555,6 +558,7 @@ public final class CurrentPlatform {
      * @return the remote messaging server
      */
     @Nullable
+    @SuppressWarnings("unused")
     public static Object getRemoteServer() {
         return null;
     }

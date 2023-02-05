@@ -13,11 +13,11 @@ package eu.locklogin.plugin.bukkit.util.files.data;
 
 import eu.locklogin.api.account.AccountID;
 import eu.locklogin.plugin.bukkit.TaskTarget;
+import ml.karmaconfigs.api.common.data.file.FileUtilities;
 import ml.karmaconfigs.api.common.karma.file.KarmaMain;
 import ml.karmaconfigs.api.common.karma.file.element.KarmaElement;
 import ml.karmaconfigs.api.common.karma.file.element.KarmaObject;
-import ml.karmaconfigs.api.common.utils.file.FileUtilities;
-import ml.karmaconfigs.api.common.utils.string.StringUtils;
+import ml.karmaconfigs.api.common.string.StringUtils;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
@@ -206,6 +206,25 @@ public final class LastLocation {
             file.set("YAW", new KarmaObject(location.getYaw()));
             file.set("WORLD", new KarmaObject(location.getWorld().getName()));
             file.set("FALLING", new KarmaObject(player.getFallDistance()));
+
+            file.save();
+        }
+    }
+
+    /**
+     * Save the player last location
+     * and fall distance
+     */
+    @SuppressWarnings("unused")
+    public void saveAt(final Location location) {
+        if (location != null && location.getWorld() != null) {
+            file.set("X", new KarmaObject(location.getX()));
+            file.set("Y", new KarmaObject(location.getY()));
+            file.set("Z", new KarmaObject(location.getZ()));
+            file.set("PITCH", new KarmaObject(location.getPitch()));
+            file.set("YAW", new KarmaObject(location.getYaw()));
+            file.set("WORLD", new KarmaObject(location.getWorld().getName()));
+            file.set("FALLING", new KarmaObject(0f));
 
             file.save();
         }

@@ -14,22 +14,18 @@ package eu.locklogin.plugin.bungee;
  * the version number 2.1.]
  */
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonObject;
 import eu.locklogin.api.common.utils.FileInfo;
 import eu.locklogin.api.common.web.ChecksumTables;
 import eu.locklogin.api.module.plugin.javamodule.server.TargetServer;
 import eu.locklogin.api.util.platform.CurrentPlatform;
 import eu.locklogin.api.util.platform.ModuleServer;
 import eu.locklogin.api.util.platform.Platform;
-import eu.locklogin.plugin.bungee.plugin.sender.DataSender;
 import eu.locklogin.plugin.bungee.util.files.cache.TargetServerStorage;
 import ml.karmaconfigs.api.bungee.KarmaPlugin;
+import ml.karmaconfigs.api.common.karma.file.KarmaMain;
+import ml.karmaconfigs.api.common.karma.file.element.KarmaElement;
+import ml.karmaconfigs.api.common.karma.file.element.KarmaObject;
 import ml.karmaconfigs.api.common.utils.enums.Level;
-import ml.karmaconfigs.api.common.utils.security.token.TokenGenerator;
-import ml.karmaconfigs.api.common.utils.url.HttpUtil;
-import ml.karmaconfigs.api.common.utils.url.URLUtils;
 import net.md_5.bungee.api.ProxyServer;
 import net.md_5.bungee.api.config.ServerInfo;
 
@@ -43,7 +39,6 @@ import java.util.UUID;
 
 public final class Main extends KarmaPlugin {
 
-    private static boolean status = false;
     private static MainBootstrap plugin;
 
     private boolean unloaded = false;
@@ -70,7 +65,6 @@ public final class Main extends KarmaPlugin {
     @Override
     @SuppressWarnings("unchecked")
     public void enable() {
-        status = true;
         plugin.enable();
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             if (!unloaded) {
@@ -78,50 +72,6 @@ public final class Main extends KarmaPlugin {
             }
         })); //Make sure the plugin shuts down correctly.
         CurrentPlatform.setOnline(ProxyServer.getInstance().getConfig().isOnlineMode());
-        String[] tries = new String[]{
-                "https://backup.karmadev.es/locklogin/com/",
-                "https://backup.karmaconfigs.ml/locklogin/com/",
-                "https://backup.karmarepo.ml/locklogin/com/",
-                "https://karmadev.es/locklogin/com/",
-                "https://karmaconfigs.ml/com/",
-                "https://karmarepo.ml/com/"
-        };
-
-        console().send("Generating communication key, please wait...");
-        String token = TokenGenerator.generateLiteral(64);
-        URL working = URLUtils.getOrBackup(tries);
-        HttpUtil utilities = URLUtils.extraUtils(working);
-        if (utilities != null) {
-            String resul = utilities.getResponse();
-
-            Gson gson = new GsonBuilder().create();
-            JsonObject element = gson.fromJson(resul, JsonObject.class);
-            try {
-                boolean success = element.getAsJsonPrimitive("success").getAsBoolean();
-                if (success) {
-                    console().send("Loaded communication key from server", Level.INFO);
-                    token = element.getAsJsonPrimitive("message").getAsString();
-                } else {
-                    console().send("Failed to generate communication key ({0}), a temporal one will be used", Level.WARNING, element.getAsJsonPrimitive("message").getAsString());
-                }
-            } catch (Throwable ex) {
-                logger().scheduleLog(Level.GRAVE, ex);
-                logger().scheduleLog(Level.INFO, "Failed to generate communication key");
-                console().send("Failed to generate communication key (error), a temporal one will be used", Level.WARNING);
-            }
-        } else {
-            console().send("Failed to generate communication key, a temporal one will be used", Level.WARNING);
-        }
-
-        try {
-            Class<?> clazz = DataSender.class;
-            Field com = clazz.getDeclaredField("com");
-            com.setAccessible(true);
-            com.set(DataSender.class, token);
-            com.setAccessible(false);
-
-            console().send("Successfully defined communication key", Level.INFO);
-        } catch (Throwable ignored) {}
 
         console().send("Loading all servers for API.", Level.INFO);
         Map<String, ServerInfo> info = ProxyServer.getInstance().getServers();
@@ -176,15 +126,10 @@ public final class Main extends KarmaPlugin {
 
     @Override
     public void onDisable() {
-        status = false;
         plugin.disable();
         stopTasks();
 
         unloaded = true;
-    }
-
-    public boolean enabled() {
-        return status;
     }
 
     @Override
@@ -214,5 +159,21 @@ public final class Main extends KarmaPlugin {
             return url.toString();
 
         return null;
+    }
+
+    @Override
+    public String getIdentifier() {
+        KarmaMain container = new KarmaMain(this, "", "/cache/stats.kf");
+        if (!container.exists())
+            container.create();
+
+        KarmaElement element = container.get("identifier", new KarmaObject(UUID.randomUUID().toString()));
+        String id = element.getObjet().getString();
+        if (!container.isSet("identifier")) {
+            container.set("identifier", new KarmaObject(id));
+            container.save();
+        }
+
+        return id;
     }
 }

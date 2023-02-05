@@ -11,12 +11,13 @@ import eu.locklogin.api.module.plugin.api.event.user.UserAuthenticateEvent;
 import eu.locklogin.api.module.plugin.javamodule.ModulePlugin;
 import eu.locklogin.api.util.platform.CurrentPlatform;
 import eu.locklogin.plugin.bukkit.TaskTarget;
+import eu.locklogin.plugin.bukkit.plugin.bungee.BungeeReceiver;
 import eu.locklogin.plugin.bukkit.plugin.bungee.BungeeSender;
 import eu.locklogin.plugin.bukkit.util.files.data.LastLocation;
 import eu.locklogin.plugin.bukkit.util.inventory.object.Button;
 import eu.locklogin.plugin.bukkit.util.player.User;
+import ml.karmaconfigs.api.common.string.StringUtils;
 import ml.karmaconfigs.api.common.utils.enums.Level;
-import ml.karmaconfigs.api.common.utils.string.StringUtils;
 import org.bukkit.Material;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.Player;
@@ -213,7 +214,7 @@ public final class PinInventory implements InventoryHolder {
                     updateInput();
                 } else {
                     String pinText = input.get(player.getUniqueId()).replaceAll("-", "");
-                    BungeeSender.sendPinInput(player, pinText);
+                    BungeeSender.sendPinInput(player, pinText, BungeeReceiver.proxies_map.get(player.getUniqueId()).toString());
 
                     input.put(player.getUniqueId(), "/-/-/-/");
                     updateInput();
@@ -277,7 +278,7 @@ public final class PinInventory implements InventoryHolder {
         ItemMeta paperMeta = paper.getItemMeta();
         assert paperMeta != null;
 
-        paperMeta.setDisplayName(StringUtils.toColor("&c" + input.getOrDefault(player.getUniqueId(), "/-/-/-/")));
+        paperMeta.setDisplayName(StringUtils.toColor("&eu.c" + input.getOrDefault(player.getUniqueId(), "/-/-/-/")));
 
         paper.setItemMeta(paperMeta);
 

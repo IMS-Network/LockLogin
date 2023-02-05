@@ -15,15 +15,13 @@ import eu.locklogin.api.account.AccountID;
 import eu.locklogin.api.account.AccountManager;
 import eu.locklogin.api.account.ClientSession;
 import eu.locklogin.api.common.security.google.GoogleAuthFactory;
-import eu.locklogin.api.common.session.PersistentSessionData;
 import eu.locklogin.api.common.session.SessionCheck;
+import eu.locklogin.api.common.utils.Channel;
 import eu.locklogin.api.common.utils.DataType;
 import eu.locklogin.api.common.utils.other.name.AccountNameDatabase;
 import eu.locklogin.api.file.PluginConfiguration;
 import eu.locklogin.api.file.PluginMessages;
 import eu.locklogin.api.file.ProxyConfiguration;
-import eu.locklogin.api.file.options.LoginConfig;
-import eu.locklogin.api.file.options.RegisterConfig;
 import eu.locklogin.api.module.plugin.api.event.user.SessionInitializationEvent;
 import eu.locklogin.api.module.plugin.api.event.util.Event;
 import eu.locklogin.api.module.plugin.client.permission.PermissionObject;
@@ -32,17 +30,18 @@ import eu.locklogin.api.module.plugin.javamodule.ModulePlugin;
 import eu.locklogin.api.module.plugin.javamodule.sender.ModulePlayer;
 import eu.locklogin.api.util.enums.Manager;
 import eu.locklogin.api.util.platform.CurrentPlatform;
-import eu.locklogin.plugin.bungee.plugin.sender.DataSender;
+import eu.locklogin.plugin.bungee.BungeeSender;
+import eu.locklogin.plugin.bungee.com.message.DataMessage;
 import eu.locklogin.plugin.bungee.util.files.Proxy;
 import ml.karmaconfigs.api.bungee.makeiteasy.BossMessage;
 import ml.karmaconfigs.api.bungee.makeiteasy.TitleMessage;
-import ml.karmaconfigs.api.common.boss.BossColor;
-import ml.karmaconfigs.api.common.boss.BossProvider;
-import ml.karmaconfigs.api.common.boss.ProgressiveBar;
-import ml.karmaconfigs.api.common.karma.APISource;
-import ml.karmaconfigs.api.common.karma.KarmaSource;
+import ml.karmaconfigs.api.common.karma.source.APISource;
+import ml.karmaconfigs.api.common.karma.source.KarmaSource;
+import ml.karmaconfigs.api.common.minecraft.boss.BossColor;
+import ml.karmaconfigs.api.common.minecraft.boss.BossProvider;
+import ml.karmaconfigs.api.common.minecraft.boss.ProgressiveBar;
+import ml.karmaconfigs.api.common.string.StringUtils;
 import ml.karmaconfigs.api.common.utils.enums.Level;
-import ml.karmaconfigs.api.common.utils.string.StringUtils;
 import net.md_5.bungee.api.ServerConnectRequest;
 import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.config.ServerInfo;
@@ -340,28 +339,21 @@ public final class User {
      * types
      */
     public synchronized void applySessionEffects() {
-        PluginConfiguration config = CurrentPlatform.getConfiguration();
-        DataSender.MessageDataBuilder builder = DataSender.getBuilder(DataType.EFFECTS, DataSender.CHANNEL_PLAYER, player);
-        if (getManager().isRegistered()) {
-            LoginConfig login = config.loginOptions();
-
-            builder.addBoolData(login.blindEffect());
-        } else {
-            RegisterConfig register = config.registerOptions();
-
-            builder.addBoolData(register.blindEffect());
-        }
-
-        DataSender.send(player, builder.build());
+        BungeeSender.sender.queue(BungeeSender.serverFromPlayer(player))
+                .insert(DataMessage.newInstance(DataType.EFFECTS, Channel.ACCOUNT)
+                        .addProperty("player", player.getUniqueId())
+                        .addProperty("effects", true).getInstance().build());
     }
 
     /**
      * Restore the player potion effects
      */
     public synchronized void restorePotionEffects() {
-        DataSender.MessageData data = DataSender.getBuilder(DataType.EFFECTS, DataSender.CHANNEL_PLAYER, player)
-                .addBoolData(false).build();
-        DataSender.send(player, data);
+
+        BungeeSender.sender.queue(BungeeSender.serverFromPlayer(player))
+                .insert(DataMessage.newInstance(DataType.EFFECTS, Channel.ACCOUNT)
+                        .addProperty("player", player.getUniqueId())
+                        .addProperty("effects", false).getInstance().build());
     }
 
     /**
@@ -404,11 +396,13 @@ public final class User {
                 time = CurrentPlatform.getConfiguration().loginOptions().timeOut();
 
                 if (CurrentPlatform.getConfiguration().loginOptions().hasBossBar()) {
-                    message = new BossMessage(plugin, CurrentPlatform.getMessages().loginBar("&a", time), time).color(BossColor.GREEN).progress(ProgressiveBar.DOWN);
+                    message = new BossMessage(plugin, CurrentPlatform.getMessages().loginBar("&a", time), time)
+                            .color(BossColor.GREEN).progress(ProgressiveBar.DOWN);
                 }
             } else {
                 if (CurrentPlatform.getConfiguration().registerOptions().hasBossBar()) {
-                    message = new BossMessage(plugin, CurrentPlatform.getMessages().registerBar("&a", time), time).color(BossColor.GREEN).progress(ProgressiveBar.DOWN);
+                    message = new BossMessage(plugin, CurrentPlatform.getMessages().registerBar("&a", time), time)
+                            .color(BossColor.GREEN).progress(ProgressiveBar.DOWN);
                 }
             }
 
