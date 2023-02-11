@@ -16,13 +16,16 @@ package eu.locklogin.plugin.bukkit.plugin;
 
 import eu.locklogin.api.account.AccountManager;
 import eu.locklogin.api.account.ClientSession;
+import eu.locklogin.api.account.MigrationManager;
 import eu.locklogin.api.common.JarManager;
-import eu.locklogin.api.common.security.TokenGen;
+import eu.locklogin.api.common.security.BackupTask;
 import eu.locklogin.api.common.security.client.ProxyCheck;
 import eu.locklogin.api.common.session.Session;
 import eu.locklogin.api.common.session.SessionCheck;
-import eu.locklogin.api.common.session.SessionDataContainer;
-import eu.locklogin.api.common.session.SessionKeeper;
+import eu.locklogin.api.common.session.online.SessionDataContainer;
+import eu.locklogin.api.common.session.persistence.SessionKeeper;
+import eu.locklogin.api.common.utils.Channel;
+import eu.locklogin.api.common.utils.DataType;
 import eu.locklogin.api.common.utils.filter.ConsoleFilter;
 import eu.locklogin.api.common.utils.filter.PluginFilter;
 import eu.locklogin.api.common.utils.other.ASCIIArtGenerator;
@@ -32,14 +35,21 @@ import eu.locklogin.api.common.web.STFetcher;
 import eu.locklogin.api.common.web.VersionDownloader;
 import eu.locklogin.api.common.web.alert.Notification;
 import eu.locklogin.api.common.web.alert.RemoteNotification;
+import eu.locklogin.api.common.web.services.LockLoginSocket;
+import eu.locklogin.api.common.web.services.socket.SocketClient;
 import eu.locklogin.api.encryption.CryptoFactory;
+import eu.locklogin.api.encryption.Validation;
 import eu.locklogin.api.file.PluginConfiguration;
 import eu.locklogin.api.file.PluginMessages;
+import eu.locklogin.api.module.plugin.api.event.user.UserAuthenticateEvent;
 import eu.locklogin.api.module.plugin.api.event.user.UserHookEvent;
+import eu.locklogin.api.module.plugin.api.event.user.UserPostValidationEvent;
 import eu.locklogin.api.module.plugin.api.event.user.UserUnHookEvent;
 import eu.locklogin.api.module.plugin.api.event.util.Event;
 import eu.locklogin.api.module.plugin.client.permission.plugin.PluginPermissions;
 import eu.locklogin.api.module.plugin.javamodule.ModulePlugin;
+import eu.locklogin.api.module.plugin.javamodule.sender.ModulePlayer;
+import eu.locklogin.api.util.enums.ManagerType;
 import eu.locklogin.api.util.platform.CurrentPlatform;
 import eu.locklogin.plugin.bukkit.Main;
 import eu.locklogin.plugin.bukkit.TaskTarget;
@@ -47,6 +57,7 @@ import eu.locklogin.plugin.bukkit.command.util.SystemCommand;
 import eu.locklogin.plugin.bukkit.listener.*;
 import eu.locklogin.plugin.bukkit.plugin.bungee.BungeeReceiver;
 import eu.locklogin.plugin.bukkit.plugin.bungee.data.MessagePool;
+import eu.locklogin.plugin.bukkit.plugin.socket.ConnectionManager;
 import eu.locklogin.plugin.bukkit.util.LockLoginPlaceholder;
 import eu.locklogin.plugin.bukkit.util.files.Config;
 import eu.locklogin.plugin.bukkit.util.files.Message;
@@ -57,16 +68,15 @@ import eu.locklogin.plugin.bukkit.util.player.ClientVisor;
 import eu.locklogin.plugin.bukkit.util.player.User;
 import me.clip.placeholderapi.PlaceholderAPI;
 import ml.karmaconfigs.api.bukkit.reflection.BarMessage;
-import ml.karmaconfigs.api.bukkit.server.BukkitServer;
-import ml.karmaconfigs.api.bukkit.server.Version;
-import ml.karmaconfigs.api.common.karmafile.karmayaml.FileCopy;
+import ml.karmaconfigs.api.common.karma.file.yaml.FileCopy;
+import ml.karmaconfigs.api.common.string.StringUtils;
 import ml.karmaconfigs.api.common.timer.SchedulerUnit;
 import ml.karmaconfigs.api.common.timer.SourceScheduler;
 import ml.karmaconfigs.api.common.timer.scheduler.SimpleScheduler;
 import ml.karmaconfigs.api.common.utils.enums.Level;
-import ml.karmaconfigs.api.common.utils.string.StringUtils;
-import ml.karmaconfigs.api.common.version.VersionUpdater;
-import ml.karmaconfigs.api.common.version.util.VersionCheckType;
+import ml.karmaconfigs.api.common.version.checker.VersionUpdater;
+import ml.karmaconfigs.api.common.version.updater.VersionCheckType;
+import net.milkbowl.vault.permission.Permission;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.Filter;
 import org.apache.logging.log4j.core.Logger;
@@ -76,6 +86,7 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Listener;
+import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.messaging.Messenger;
 import org.bukkit.plugin.messaging.PluginMessageListenerRegistration;
 
@@ -114,8 +125,6 @@ public final class Manager {
 
         ProxyCheck.scan();
 
-        PlayerAccount.migrateV1();
-        PlayerAccount.migrateV2();
         PlayerAccount.migrateV3();
         MessagePool.startCheckTask();
 
@@ -142,6 +151,10 @@ public final class Manager {
 
         loadCache();
 
+        BackupTask.performBackup();
+        SourceScheduler backup_scheduler = new SourceScheduler(plugin, 1, SchedulerUnit.HOUR, true);
+        backup_scheduler.restartAction(BackupTask::performBackup);
+
         PluginConfiguration config = CurrentPlatform.getConfiguration();
         if (config.useVirtualID()) {
             CryptoFactory.loadVirtualID();
@@ -149,26 +162,9 @@ public final class Manager {
             console.send("Virtual ID ( disabled by default) is disabled. You should enable it to enforce you clients security against database leaks", Level.GRAVE);
         }
 
-        if (config.isBungeeCord()) {
-            Messenger messenger = plugin.getServer().getMessenger();
-            BungeeReceiver receiver = new BungeeReceiver();
-
-            PluginMessageListenerRegistration registration_account = messenger.registerIncomingPluginChannel(plugin, "ll:account", receiver);
-            messenger.registerOutgoingPluginChannel(plugin, "ll:account");
-            PluginMessageListenerRegistration registration_plugin = messenger.registerIncomingPluginChannel(plugin, "ll:plugin", receiver);
-            PluginMessageListenerRegistration access_plugin = messenger.registerIncomingPluginChannel(plugin, "ll:access", receiver);
-            messenger.registerOutgoingPluginChannel(plugin, "ll:access");
-
-            if (registration_account.isValid() && registration_plugin.isValid() && access_plugin.isValid()) {
-                console.send("Registered plugin message listeners", Level.OK);
-            } else {
-                console.send("Something went wrong while trying to register message listeners, things may not work properly", Level.GRAVE);
-            }
-        }
-
-        AccountManager manager = CurrentPlatform.getAccountManager(eu.locklogin.api.util.enums.Manager.CUSTOM, null);
-        if (manager != null) {
-            Set<AccountManager> accounts = manager.getAccounts();
+        AccountManager t_manager = CurrentPlatform.getAccountManager(ManagerType.CUSTOM, null);
+        if (t_manager != null) {
+            Set<AccountManager> accounts = t_manager.getAccounts();
             Set<AccountManager> nonLocked = new HashSet<>();
             for (AccountManager account : accounts) {
                 LockedAccount locked = new LockedAccount(account.getUUID());
@@ -209,6 +205,123 @@ public final class Manager {
         }, 20 * 10);
 
         initialized = true;
+
+        console.send("Connecting to LockLogin web services (statistics and bungee communication), please wait...", Level.INFO);
+        SocketClient socket = new LockLoginSocket();
+        ConnectionManager c_Manager = new ConnectionManager(socket);
+
+        c_Manager.connect(5).whenComplete((tries_amount) -> {
+            if (tries_amount > 0) {
+                console.send("Connected to LockLogin web services after {0} tries", Level.WARNING, tries_amount);
+            }
+
+            switch (tries_amount) {
+                case -1:
+                    //TODO: Allow configure tries amount from config and read that value
+                    console.send("Failed to connect to LockLogin web services after 5 tries, giving up...", Level.WARNING);
+                case -2:
+                    break;
+                case 0:
+                    console.send("Connected to LockLogin web services successfully", Level.INFO);
+                default:
+                    console.send("Registering LockLogin web service listeners", Level.INFO);
+                    c_Manager.addListener(Channel.ACCOUNT, DataType.PIN, (data) -> {
+                        if (data.has("pin_input") && data.has("player")) {
+                            UUID uuid = UUID.fromString(data.get("player").getAsString());
+                            Player player = plugin.getServer().getPlayer(uuid);
+
+                            if (player != null) {
+                                String pin = data.get("pin_input").getAsString();
+
+                                User user = new User(player);
+                                ClientSession session = user.getSession();
+                                AccountManager manager = user.getManager();
+                                if (session.isValid()) {
+                                    PluginMessages messages = CurrentPlatform.getMessages();
+
+                                    if (manager.hasPin() && CryptoFactory.getBuilder().withPassword(pin).withToken(manager.getPin()).build().validate(Validation.ALL) && !pin.equalsIgnoreCase("error")) {
+                                        UserAuthenticateEvent event = new UserAuthenticateEvent(UserAuthenticateEvent.AuthType.PIN,
+                                                (manager.has2FA() ? UserAuthenticateEvent.Result.SUCCESS_TEMP : UserAuthenticateEvent.Result.SUCCESS),
+                                                user.getModule(),
+                                                (manager.has2FA() ? messages.gAuthInstructions() : messages.logged()), null);
+                                        ModulePlugin.callEvent(event);
+
+                                        user.send(messages.prefix() + event.getAuthMessage());
+                                        session.setPinLogged(true);
+                                        session.set2FALogged(!manager.has2FA());
+                                    } else {
+                                        if (pin.equalsIgnoreCase("error") || !manager.hasPin()) {
+                                            UserAuthenticateEvent event = new UserAuthenticateEvent(UserAuthenticateEvent.AuthType.PIN,
+                                                    UserAuthenticateEvent.Result.ERROR,
+                                                    user.getModule(),
+                                                    (manager.has2FA() ? messages.gAuthInstructions() : messages.logged()), null);
+                                            ModulePlugin.callEvent(event);
+
+                                            user.send(messages.prefix() + event.getAuthMessage());
+                                            session.setPinLogged(true);
+                                            session.set2FALogged(!manager.has2FA());
+                                        } else {
+                                            if (!pin.equalsIgnoreCase("error") && manager.hasPin()) {
+                                                UserAuthenticateEvent event = new UserAuthenticateEvent(UserAuthenticateEvent.AuthType.PIN,
+                                                        UserAuthenticateEvent.Result.ERROR,
+                                                        user.getModule(),
+                                                        "", null);
+                                                ModulePlugin.callEvent(event);
+
+                                                if (!event.getAuthMessage().isEmpty()) {
+                                                    user.send(messages.prefix() + event.getAuthMessage());
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                    c_Manager.addListener(Channel.ACCOUNT, DataType.JOIN, (data) -> {
+                        if (data.has("player")) {
+                            UUID uuid = UUID.fromString(data.get("player").getAsString());
+                            Player player = plugin.getServer().getPlayer(uuid);
+
+                            if (player != null) {
+                                User user = new User(player);
+                                UserPostValidationEvent event = new UserPostValidationEvent(user.getModule(), name, null);
+                                ModulePlugin.callEvent(event);
+                            }
+                        }
+                    });
+                    c_Manager.addListener(Channel.PLUGIN, DataType.PLAYER, (data) -> {
+                        if (data.has("player_info")) {
+                            ModulePlayer modulePlayer = StringUtils.loadUnsafe(data.get("player_info").getAsString());
+                            if (modulePlayer != null) {
+                                AccountManager manager = modulePlayer.getAccount();
+
+                                if (manager != null) {
+                                    AccountManager newManager = new PlayerAccount(manager.getUUID());
+                                    MigrationManager migrationManager = new MigrationManager(manager, newManager);
+                                    migrationManager.startMigration();
+                                }
+                            }
+                        }
+                    });
+                    break;
+            }
+
+            initialized = true;
+        });
+
+        if (config.isBungeeCord())
+            registerBungee(socket, c_Manager);
+
+        if (plugin.getServer().getPluginManager().isPluginEnabled("Vault")) {
+            RegisteredServiceProvider<Permission> rsp = plugin.getServer().getServicesManager().getRegistration(Permission.class);
+            if (rsp != null) {
+                Permission permission = rsp.getProvider();
+                if (permission.isEnabled()) {
+                    plugin.console().send("Detected permission provider {0}. LockLogin will remove all player permissions and OP when the client connects and restore them after a success login for better security", Level.INFO, rsp.getPlugin().getName());
+                }
+            }
+        }
     }
 
     public static void terminate() {
@@ -254,6 +367,28 @@ public final class Manager {
         console.send("&eversion:&6 {0}", version);
         console.send(" ");
         console.send("&e-----------------------");
+    }
+
+    static void registerBungee(final SocketClient client, final ConnectionManager manager) {
+        Messenger messenger = plugin.getServer().getMessenger();
+        BungeeReceiver receiver = new BungeeReceiver(client);
+
+        PluginMessageListenerRegistration registration_account = messenger.registerIncomingPluginChannel(plugin, "ll:account", receiver);
+        messenger.registerOutgoingPluginChannel(plugin, "ll:account");
+        PluginMessageListenerRegistration registration_plugin = messenger.registerIncomingPluginChannel(plugin, "ll:plugin", receiver);
+        PluginMessageListenerRegistration access_plugin = messenger.registerIncomingPluginChannel(plugin, "ll:access", receiver);
+        messenger.registerOutgoingPluginChannel(plugin, "ll:access");
+
+        if (registration_account.isValid() && registration_plugin.isValid() && access_plugin.isValid()) {
+            console.send("Registered plugin message listeners", Level.OK);
+        } else {
+            console.send("Something went wrong while trying to register message listeners, things may not work properly", Level.GRAVE);
+        }
+
+        manager.onProxyInitialization((name) -> {
+            console.send("Received initialization request from proxy", Level.WARNING);
+            receiver.registerUnder(name, client);
+        });
     }
 
     /**
@@ -399,13 +534,17 @@ public final class Manager {
         PluginConfiguration config = CurrentPlatform.getConfiguration();
         Metrics metrics = new Metrics(plugin, 6513);
 
-        metrics.addCustomChart(new SimplePie("used_locale", () -> config.getLang().friendlyName(config.getLangName())));
-        metrics.addCustomChart(new SimplePie("clear_chat", () -> String.valueOf(config.clearChat())
-                .replace("true", "Clear chat")
-                .replace("false", "Don't clear chat")));
-        metrics.addCustomChart(new SimplePie("sessions_enabled", () -> String.valueOf(config.enableSessions())
-                .replace("true", "Sessions enabled")
-                .replace("false", "Sessions disabled")));
+        if (config.shareBStats()) {
+            metrics.addCustomChart(new SimplePie("used_locale", () -> config.getLang().friendlyName(config.getLangName())));
+            metrics.addCustomChart(new SimplePie("clear_chat", () -> String.valueOf(config.clearChat())
+                    .replace("true", "Clear chat")
+                    .replace("false", "Don't clear chat")));
+            metrics.addCustomChart(new SimplePie("sessions_enabled", () -> String.valueOf(config.enableSessions())
+                    .replace("true", "Sessions enabled")
+                    .replace("false", "Sessions disabled")));
+        } else {
+            console.send("Metrics are disabled, please note this is an open source free project and we use metrics to know if the project is being active by users. If we don't see active users using this project, the project may reach the dead line meaning no more updates or support. We highly recommend to you to share statistics, as this won't share any information of your server but the country, os and some other information that may be util for us", Level.GRAVE);
+        }
     }
 
     /**
@@ -426,10 +565,10 @@ public final class Manager {
         plugin.getServer().getPluginManager().registerEvents(inventory, plugin);
         plugin.getServer().getPluginManager().registerEvents(interact, plugin);
 
-        if (BukkitServer.isOver(Version.v1_7_10)) {
+        /*if (BukkitServer.isOver(Version.v1_8)) {
             Listener interact_new = new InteractListenerNew();
             plugin.getServer().getPluginManager().registerEvents(interact_new, plugin);
-        }
+        }*/
     }
 
     /**
@@ -446,6 +585,7 @@ public final class Manager {
     /**
      * Perform a version check
      */
+    @SuppressWarnings("deprecation")
     static void performVersionCheck() {
         if (updater == null)
             updater = VersionUpdater.createNewBuilder(plugin).withVersionType(VersionCheckType.RESOLVABLE_ID).withVersionResolver(versionID).build();

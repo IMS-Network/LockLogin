@@ -34,10 +34,11 @@ public @interface SystemCommand {
      */
     class manager {
 
+        private final static Package pack = SystemCommand.class.getPackage();
+
         /**
          * Get a list of recognized system account commands
-         *
-         * @return a list of system commands
+         * @return an array of system commands
          */
         public static Class<?>[] recognizedClasses() {
             return new Class[]{
@@ -50,6 +51,14 @@ public @interface SystemCommand {
                     PinCommand.class,
                     PlayerInfoCommand.class,
                     RegisterCommand.class};
+        }
+
+        private static Class<?> toClass(final String pack, final String clazz) {
+            try {
+                return Class.forName(pack + "." + clazz.substring(0, clazz.lastIndexOf('.')));
+            } catch (Throwable ignored) {}
+
+            return null;
         }
 
         /**

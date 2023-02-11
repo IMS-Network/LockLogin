@@ -13,7 +13,7 @@ package eu.locklogin.plugin.bukkit.command.util;
 
 import eu.locklogin.api.util.platform.CurrentPlatform;
 import eu.locklogin.plugin.bukkit.command.*;
-import ml.karmaconfigs.api.common.utils.string.StringUtils;
+import ml.karmaconfigs.api.common.string.StringUtils;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -38,11 +38,12 @@ public @interface SystemCommand {
      * Get the plugin command manager
      */
     class manager {
+        
+        private final static Package pack = SystemCommand.class.getPackage();
 
         /**
          * Get a list of recognized system account commands
-         *
-         * @return a list of system commands
+         * @return an array of system commands
          */
         public static Class<?>[] recognizedClasses() {
             return new Class[]{
@@ -57,6 +58,14 @@ public @interface SystemCommand {
                     PlayerInfoCommand.class,
                     RegisterCommand.class,
                     SetSpawnCommand.class};
+        }
+
+        private static Class<?> toClass(final String pack, final String clazz) {
+            try {
+                return Class.forName(pack + "." + clazz.substring(0, clazz.lastIndexOf('.')));
+            } catch (Throwable ignored) {}
+
+            return null;
         }
 
         /**

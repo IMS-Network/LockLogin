@@ -15,7 +15,7 @@ package eu.locklogin.plugin.bukkit.listener;
  */
 
 import eu.locklogin.api.account.ClientSession;
-import eu.locklogin.api.common.session.SessionKeeper;
+import eu.locklogin.api.common.session.persistence.SessionKeeper;
 import eu.locklogin.api.file.PluginConfiguration;
 import eu.locklogin.api.module.plugin.api.event.user.UserQuitEvent;
 import eu.locklogin.api.module.plugin.api.event.util.Event;
@@ -28,7 +28,6 @@ import eu.locklogin.plugin.bukkit.util.files.data.Spawn;
 import eu.locklogin.plugin.bukkit.util.player.ClientVisor;
 import eu.locklogin.plugin.bukkit.util.player.User;
 import eu.locklogin.plugin.bukkit.util.player.UserDatabase;
-import ml.karmaconfigs.api.bukkit.server.BukkitServer;
 import ml.karmaconfigs.api.common.timer.scheduler.LateScheduler;
 import ml.karmaconfigs.api.common.timer.scheduler.worker.AsyncLateScheduler;
 import org.bukkit.entity.Player;
@@ -38,8 +37,6 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerKickEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.Set;
 import java.util.UUID;

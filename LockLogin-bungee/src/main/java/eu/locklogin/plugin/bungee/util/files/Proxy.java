@@ -15,10 +15,11 @@ package eu.locklogin.plugin.bungee.util.files;
  */
 
 import eu.locklogin.api.file.ProxyConfiguration;
-import ml.karmaconfigs.api.common.karmafile.karmayaml.FileCopy;
-import ml.karmaconfigs.api.common.karmafile.karmayaml.KarmaYamlManager;
-import ml.karmaconfigs.api.common.karmafile.karmayaml.YamlReloader;
-import ml.karmaconfigs.api.common.utils.string.StringUtils;
+import ml.karmaconfigs.api.common.karma.file.yaml.FileCopy;
+import ml.karmaconfigs.api.common.karma.file.yaml.KarmaYamlManager;
+import ml.karmaconfigs.api.common.karma.file.yaml.YamlReloader;
+import ml.karmaconfigs.api.common.string.StringUtils;
+import ml.karmaconfigs.api.common.string.random.RandomString;
 import net.md_5.bungee.api.config.ServerInfo;
 import net.md_5.bungee.api.connection.ProxiedPlayer;
 
@@ -160,7 +161,7 @@ public final class Proxy extends ProxyConfiguration {
     public String proxyKey() {
         String key = cfg.getString("ProxyKey", "");
         if (StringUtils.isNullOrEmpty(key)) {
-            key = StringUtils.generateString().create();
+            key = new RandomString().create();
 
             cfg.set("ProxyKey", key);
             cfg = cfg.save(cfg_file, plugin, "cfg/proxy.yml");
@@ -207,26 +208,6 @@ public final class Proxy extends ProxyConfiguration {
         }
 
         return uuid;
-    }
-
-    /**
-     * Get the proxy channel address
-     *
-     * @return the proxy channel address
-     */
-    @Override
-    public String messageAddress() {
-        return null;
-    }
-
-    /**
-     * Get the proxy channel port
-     *
-     * @return the proxy channel port
-     */
-    @Override
-    public int messagePort() {
-        return 0;
     }
 
     /**

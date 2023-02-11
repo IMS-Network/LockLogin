@@ -3,16 +3,20 @@ package eu.locklogin.api.common.web;
 import eu.locklogin.api.common.utils.FileInfo;
 import eu.locklogin.api.common.utils.dependencies.Dependency;
 import eu.locklogin.api.common.utils.dependencies.PluginDependency;
-import ml.karmaconfigs.api.common.karma.APISource;
-import ml.karmaconfigs.api.common.karma.KarmaSource;
-import ml.karmaconfigs.api.common.karmafile.KarmaFile;
-import ml.karmaconfigs.api.common.utils.file.FileUtilities;
+import ml.karmaconfigs.api.common.data.path.PathUtilities;
+import ml.karmaconfigs.api.common.karma.file.KarmaMain;
+import ml.karmaconfigs.api.common.karma.file.element.KarmaPrimitive;
+import ml.karmaconfigs.api.common.karma.file.element.types.Element;
+import ml.karmaconfigs.api.common.karma.file.element.types.ElementPrimitive;
+import ml.karmaconfigs.api.common.karma.source.APISource;
+import ml.karmaconfigs.api.common.karma.source.KarmaSource;
 
 import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Timer;
@@ -83,12 +87,10 @@ public final class ChecksumTables {
                         InputStreamReader reader = new InputStreamReader(inputStream, StandardCharsets.UTF_8);
                         BufferedReader bf = new BufferedReader(reader);
 
-                        File dataFile = new File(FileUtilities.getProjectFolder("plugins") + File.separator + "LockLogin", "tables.lldb");
-                        @SuppressWarnings("deprecation")
-                        KarmaFile checksum = new KarmaFile(dataFile);
-                        checksum.create();
+                        Path dataFile = lockLogin.getDataPath().resolve("cache").resolve("tables.lldb");
+                        PathUtilities.create(dataFile);
 
-                        BufferedWriter writer = Files.newBufferedWriter(dataFile.toPath(), StandardCharsets.UTF_8);
+                        BufferedWriter writer = Files.newBufferedWriter(dataFile, StandardCharsets.UTF_8);
                         String line;
                         while ((line = bf.readLine()) != null) {
                             writer.write(line + "\n");
@@ -101,13 +103,25 @@ public final class ChecksumTables {
                         reader.close();
                         bf.close();
 
+                        KarmaMain checksum = new KarmaMain(dataFile);
+                        checksum.create();
+
                         for (Dependency dependency : Dependency.values()) {
                             String name = dependency.getAsDependency().getName();
-                            long adler = checksum.getLong(name + "_adler", 0L);
-                            long crc = checksum.getLong(name + "_crc", 0L);
+                            Element<?> adler = checksum.get("adler." + name.replace(" ", "_"), new KarmaPrimitive(0L));
+                            Element<?> crc = checksum.get("crc." + name.replace(" ", "_"), new KarmaPrimitive(0L));
 
-                            adler_tables.put(name, adler);
-                            crc_tables.put(name, crc);
+                            System.out.println("Reading checksum for: " + name.replace(" ", "_"));
+
+                            if (adler.isPrimitive() && crc.isPrimitive()) {
+                                ElementPrimitive adlerPrimitive = adler.getAsPrimitive();
+                                ElementPrimitive crcPrimitive = crc.getAsPrimitive();
+
+                                if (adlerPrimitive.isNumber() && crcPrimitive.isNumber()) {
+                                    adler_tables.put(name, adlerPrimitive.asLong());
+                                    crc_tables.put(name, crcPrimitive.asLong());
+                                }
+                            }
                         }
 
                         checksum.delete();

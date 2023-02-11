@@ -12,10 +12,8 @@ package eu.locklogin.plugin.bukkit.util.player;
  */
 
 import eu.locklogin.api.account.AccountID;
-import eu.locklogin.api.account.AccountManager;
 import eu.locklogin.api.account.ClientSession;
 import eu.locklogin.api.common.security.google.GoogleAuthFactory;
-import eu.locklogin.api.common.session.PersistentSessionData;
 import eu.locklogin.api.common.session.SessionCheck;
 import eu.locklogin.api.common.utils.other.name.AccountNameDatabase;
 import eu.locklogin.api.file.PluginConfiguration;
@@ -27,19 +25,19 @@ import eu.locklogin.api.module.plugin.api.event.util.Event;
 import eu.locklogin.api.module.plugin.client.permission.PermissionObject;
 import eu.locklogin.api.module.plugin.javamodule.ModulePlugin;
 import eu.locklogin.api.module.plugin.javamodule.sender.ModulePlayer;
-import eu.locklogin.api.util.enums.Manager;
+import eu.locklogin.api.util.enums.ManagerType;
 import eu.locklogin.api.util.platform.CurrentPlatform;
 import eu.locklogin.plugin.bukkit.TaskTarget;
 import me.clip.placeholderapi.PlaceholderAPI;
 import ml.karmaconfigs.api.bukkit.reflection.BossMessage;
 import ml.karmaconfigs.api.bukkit.reflection.TitleMessage;
-import ml.karmaconfigs.api.common.boss.BossColor;
-import ml.karmaconfigs.api.common.boss.BossProvider;
-import ml.karmaconfigs.api.common.boss.ProgressiveBar;
-import ml.karmaconfigs.api.common.karma.APISource;
-import ml.karmaconfigs.api.common.karma.KarmaSource;
+import ml.karmaconfigs.api.common.karma.source.APISource;
+import ml.karmaconfigs.api.common.karma.source.KarmaSource;
+import ml.karmaconfigs.api.common.minecraft.boss.BossColor;
+import ml.karmaconfigs.api.common.minecraft.boss.BossProvider;
+import ml.karmaconfigs.api.common.minecraft.boss.ProgressiveBar;
+import ml.karmaconfigs.api.common.string.StringUtils;
 import ml.karmaconfigs.api.common.utils.enums.Level;
-import ml.karmaconfigs.api.common.utils.string.StringUtils;
 import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.GameMode;
 import org.bukkit.entity.Player;
@@ -63,7 +61,7 @@ public final class User {
     private final static Set<UUID> registered = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final static Set<UUID> panicking = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final static Map<UUID, Collection<PotionEffect>> effects = new ConcurrentHashMap<>();
-    private final static Map<UUID, AccountManager> managers = new ConcurrentHashMap<>();
+    private final static Map<UUID, eu.locklogin.api.account.AccountManager> managers = new ConcurrentHashMap<>();
     private final static Map<UUID, SessionCheck<Player>> sessionChecks = new ConcurrentHashMap<>();
     @SuppressWarnings("FieldMayBeFinal") //This is modified by cache loader
     private static Map<UUID, ClientSession> sessions = new ConcurrentHashMap<>();
@@ -85,7 +83,7 @@ public final class User {
         User loaded = UserDatabase.loadUser(player);
         if (loaded == null) {
             if (CurrentPlatform.isValidAccountManager()) {
-                AccountManager manager = CurrentPlatform.getAccountManager(Manager.CUSTOM, AccountID.fromUUID(player.getUniqueId()));
+                eu.locklogin.api.account.AccountManager manager = CurrentPlatform.getAccountManager(ManagerType.CUSTOM, AccountID.fromUUID(player.getUniqueId()));
 
                 if (manager == null) {
                     plugin.getPluginLoader().disablePlugin(plugin);
@@ -414,6 +412,7 @@ public final class User {
     /**
      * Set the client in panic mode
      */
+    @SuppressWarnings("unused")
     public void panic() {
         panicking.add(player.getUniqueId());
     }
@@ -454,11 +453,13 @@ public final class User {
                 time = CurrentPlatform.getConfiguration().loginOptions().timeOut();
 
                 if (CurrentPlatform.getConfiguration().loginOptions().hasBossBar()) {
-                    message = new BossMessage(plugin, CurrentPlatform.getMessages().loginBar("&a", time), time).color(BossColor.GREEN).progress(ProgressiveBar.DOWN);
+                    message = new BossMessage(plugin, CurrentPlatform.getMessages().loginBar("&a", time), time)
+                            .color(BossColor.GREEN).progress(ProgressiveBar.DOWN);
                 }
             } else {
                 if (CurrentPlatform.getConfiguration().registerOptions().hasBossBar()) {
-                    message = new BossMessage(plugin, CurrentPlatform.getMessages().registerBar("&a", time), time).color(BossColor.GREEN).progress(ProgressiveBar.DOWN);
+                    message = new BossMessage(plugin, CurrentPlatform.getMessages().registerBar("&a", time), time)
+                            .color(BossColor.GREEN).progress(ProgressiveBar.DOWN);
                 }
             }
 
@@ -485,7 +486,7 @@ public final class User {
      * @throws IllegalStateException if the current manager is null
      */
     @NotNull
-    public AccountManager getManager() throws IllegalStateException {
+    public eu.locklogin.api.account.AccountManager getManager() throws IllegalStateException {
         return managers.get(player.getUniqueId());
     }
 
@@ -536,6 +537,7 @@ public final class User {
      *
      * @return if the client is panicking
      */
+    @SuppressWarnings("unused")
     public boolean isPanicking() {
         return panicking.contains(player.getUniqueId());
     }

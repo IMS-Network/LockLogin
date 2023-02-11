@@ -15,21 +15,20 @@ package eu.locklogin.plugin.bukkit.command;
  */
 
 import eu.locklogin.api.account.AccountID;
-import eu.locklogin.api.account.AccountManager;
-import eu.locklogin.api.common.session.PersistentSessionData;
+import eu.locklogin.api.common.session.persistence.PersistentSessionData;
 import eu.locklogin.api.common.utils.InstantParser;
 import eu.locklogin.api.common.utils.other.LockedAccount;
 import eu.locklogin.api.common.utils.other.name.AccountNameDatabase;
 import eu.locklogin.api.file.PluginMessages;
-import eu.locklogin.api.file.plugin.Alias;
+import eu.locklogin.api.file.pack.Alias;
 import eu.locklogin.api.module.plugin.client.permission.plugin.PluginPermissions;
-import eu.locklogin.api.util.enums.Manager;
+import eu.locklogin.api.util.enums.ManagerType;
 import eu.locklogin.api.util.platform.CurrentPlatform;
 import eu.locklogin.plugin.bukkit.command.util.SystemCommand;
 import eu.locklogin.plugin.bukkit.util.files.client.OfflineClient;
 import eu.locklogin.plugin.bukkit.util.inventory.PlayersInfoInventory;
 import eu.locklogin.plugin.bukkit.util.player.User;
-import ml.karmaconfigs.api.common.utils.string.StringUtils;
+import ml.karmaconfigs.api.common.string.StringUtils;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -42,6 +41,7 @@ import java.util.*;
 import static eu.locklogin.plugin.bukkit.LockLogin.*;
 
 @SystemCommand(command = "playerinfo")
+@SuppressWarnings("unused")
 public final class PlayerInfoCommand implements CommandExecutor {
 
     /**
@@ -89,7 +89,7 @@ public final class PlayerInfoCommand implements CommandExecutor {
                                             Set<AccountID> everyoneAccounts = new LinkedHashSet<>();
 
                                             for (Player online : plugin.getServer().getOnlinePlayers()) {
-                                                AccountManager manager = CurrentPlatform.getAccountManager(Manager.CUSTOM, AccountID.fromUUID(online.getUniqueId()));
+                                                eu.locklogin.api.account.AccountManager manager = CurrentPlatform.getAccountManager(ManagerType.CUSTOM, AccountID.fromUUID(online.getUniqueId()));
                                                 if (manager != null)
                                                     everyoneAccounts.add(manager.getUUID());
                                             }
@@ -97,7 +97,7 @@ public final class PlayerInfoCommand implements CommandExecutor {
                                             new PlayersInfoInventory(player, everyoneAccounts);
                                         case "persistent":
                                             Set<AccountID> accountIDs = new LinkedHashSet<>();
-                                            for (AccountManager account : PersistentSessionData.getPersistentAccounts())
+                                            for (eu.locklogin.api.account.AccountManager account : PersistentSessionData.getPersistentAccounts())
                                                 accountIDs.add(account.getUUID());
 
                                             new PlayersInfoInventory(player, accountIDs);
@@ -110,7 +110,7 @@ public final class PlayerInfoCommand implements CommandExecutor {
                                             for (Player online : plugin.getServer().getOnlinePlayers()) {
                                                 if (online.hasPermission(permission)) {
 
-                                                    AccountManager manager = CurrentPlatform.getAccountManager(Manager.CUSTOM, AccountID.fromUUID(online.getUniqueId()));
+                                                    eu.locklogin.api.account.AccountManager manager = CurrentPlatform.getAccountManager(ManagerType.CUSTOM, AccountID.fromUUID(online.getUniqueId()));
                                                     if (manager != null)
                                                         permissionAccounts.add(manager.getUUID());
                                                 }
@@ -124,7 +124,7 @@ public final class PlayerInfoCommand implements CommandExecutor {
                                 AccountNameDatabase.find(target).whenComplete((nsr) -> {
                                     if (nsr.singleResult()) {
                                         OfflineClient offline = new OfflineClient(target);
-                                        AccountManager manager = offline.getAccount();
+                                        eu.locklogin.api.account.AccountManager manager = offline.getAccount();
 
                                         if (manager != null) {
                                             AccountID id = manager.getUUID();
@@ -177,7 +177,7 @@ public final class PlayerInfoCommand implements CommandExecutor {
 
                             for (String name : args) {
                                 OfflineClient offline = new OfflineClient(name);
-                                AccountManager manager = offline.getAccount();
+                                eu.locklogin.api.account.AccountManager manager = offline.getAccount();
 
                                 if (manager != null) {
                                     accounts.add(manager.getUUID());

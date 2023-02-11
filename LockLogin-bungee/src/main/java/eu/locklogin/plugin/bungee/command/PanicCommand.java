@@ -17,34 +17,39 @@ package eu.locklogin.plugin.bungee.command;
 import eu.locklogin.api.account.AccountManager;
 import eu.locklogin.api.account.ClientSession;
 import eu.locklogin.api.common.security.BruteForce;
+import eu.locklogin.api.common.utils.Channel;
 import eu.locklogin.api.common.utils.DataType;
+import eu.locklogin.api.common.utils.plugin.ComponentFactory;
 import eu.locklogin.api.encryption.CryptoFactory;
 import eu.locklogin.api.encryption.Validation;
 import eu.locklogin.api.file.PluginConfiguration;
 import eu.locklogin.api.file.PluginMessages;
 import eu.locklogin.api.module.plugin.api.event.user.UserAuthenticateEvent;
-import eu.locklogin.api.module.plugin.client.permission.plugin.PluginPermissions;
 import eu.locklogin.api.module.plugin.javamodule.ModulePlugin;
 import eu.locklogin.api.util.platform.CurrentPlatform;
+import eu.locklogin.plugin.bungee.BungeeSender;
+import eu.locklogin.plugin.bungee.com.message.DataMessage;
 import eu.locklogin.plugin.bungee.command.util.SystemCommand;
-import eu.locklogin.plugin.bungee.plugin.sender.DataSender;
+import eu.locklogin.plugin.bungee.plugin.Manager;
 import eu.locklogin.plugin.bungee.util.player.User;
+import ml.karmaconfigs.api.common.security.token.TokenGenerator;
+import ml.karmaconfigs.api.common.string.StringUtils;
 import ml.karmaconfigs.api.common.utils.enums.Level;
-import ml.karmaconfigs.api.common.utils.security.token.TokenGenerator;
-import ml.karmaconfigs.api.common.utils.string.StringUtils;
 import net.md_5.bungee.api.CommandSender;
-import net.md_5.bungee.api.chat.*;
+import net.md_5.bungee.api.chat.ClickEvent;
+import net.md_5.bungee.api.chat.HoverEvent;
+import net.md_5.bungee.api.chat.TextComponent;
+import net.md_5.bungee.api.chat.hover.content.Text;
 import net.md_5.bungee.api.connection.ProxiedPlayer;
 import net.md_5.bungee.api.plugin.Command;
 
 import java.net.InetAddress;
-import java.net.SocketAddress;
 import java.util.List;
 
 import static eu.locklogin.plugin.bungee.LockLogin.*;
-import static eu.locklogin.plugin.bungee.plugin.sender.DataSender.CHANNEL_PLAYER;
 
 @SystemCommand(command = "panic")
+@SuppressWarnings("unused")
 public final class PanicCommand extends Command {
 
     private final static PluginConfiguration config = CurrentPlatform.getConfiguration();
@@ -122,14 +127,10 @@ public final class PanicCommand extends Command {
                                         String password = TokenGenerator.generateLiteral(32);
 
                                         user.send(messages.panicRequested());
-                                        TextComponent component = new TextComponent(StringUtils.toColor("&7Panic token: &c" + password));
-                                        try {
-                                            component.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new ComponentBuilder().append(StringUtils.toColor("&bClick to copy")).create()));
-                                        } catch (Throwable ex) {
-                                            component.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new BaseComponent[]{new TextComponent(StringUtils.toColor("&bClick to copy"))}));
-                                        }
-                                        component.setClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, password));
-                                        user.send(component);
+                                        ComponentFactory cf = new ComponentFactory(StringUtils.toColor("&7Panic token: &e" + password))
+                                                .hover(StringUtils.toColor("&bClick to copy"))
+                                                .click(ClickEvent.Action.SUGGEST_COMMAND, password);
+                                        user.send(cf.get());
 
                                         manager.setPanic(password);
 
@@ -137,13 +138,14 @@ public final class PanicCommand extends Command {
 
                                         user.restorePotionEffects();
 
-                                        DataSender.MessageData login = DataSender.getBuilder(DataType.SESSION, CHANNEL_PLAYER, player).build();
-                                        DataSender.MessageData pin = DataSender.getBuilder(DataType.PIN, CHANNEL_PLAYER, player).addTextData("close").build();
-                                        DataSender.MessageData gauth = DataSender.getBuilder(DataType.GAUTH, CHANNEL_PLAYER, player).build();
+                                        Manager.sendFunction.apply(DataMessage.newInstance(DataType.SESSION, Channel.ACCOUNT, player)
+                                                .getInstance(), BungeeSender.serverFromPlayer(player));
 
-                                        DataSender.send(player, pin);
-                                        DataSender.send(player, gauth);
-                                        DataSender.send(player, login);
+                                        Manager.sendFunction.apply(DataMessage.newInstance(DataType.PIN, Channel.ACCOUNT, player)
+                                                .addProperty("pin", false).getInstance(), BungeeSender.serverFromPlayer(player));
+
+                                        Manager.sendFunction.apply(DataMessage.newInstance(DataType.GAUTH, Channel.ACCOUNT, player)
+                                                .getInstance(), BungeeSender.serverFromPlayer(player));
 
                                         UserAuthenticateEvent event = new UserAuthenticateEvent(UserAuthenticateEvent.AuthType.API,
                                                 UserAuthenticateEvent.Result.SUCCESS,

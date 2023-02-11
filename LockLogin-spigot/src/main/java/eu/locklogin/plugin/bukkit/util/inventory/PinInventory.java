@@ -2,7 +2,7 @@ package eu.locklogin.plugin.bukkit.util.inventory;
 
 import eu.locklogin.api.account.AccountManager;
 import eu.locklogin.api.account.ClientSession;
-import eu.locklogin.api.common.session.SessionDataContainer;
+import eu.locklogin.api.common.session.online.SessionDataContainer;
 import eu.locklogin.api.encryption.CryptoFactory;
 import eu.locklogin.api.encryption.Validation;
 import eu.locklogin.api.file.PluginConfiguration;
@@ -11,12 +11,14 @@ import eu.locklogin.api.module.plugin.api.event.user.UserAuthenticateEvent;
 import eu.locklogin.api.module.plugin.javamodule.ModulePlugin;
 import eu.locklogin.api.util.platform.CurrentPlatform;
 import eu.locklogin.plugin.bukkit.TaskTarget;
+import eu.locklogin.plugin.bukkit.listener.data.TransientMap;
+import eu.locklogin.plugin.bukkit.plugin.bungee.BungeeReceiver;
 import eu.locklogin.plugin.bukkit.plugin.bungee.BungeeSender;
 import eu.locklogin.plugin.bukkit.util.files.data.LastLocation;
 import eu.locklogin.plugin.bukkit.util.inventory.object.Button;
 import eu.locklogin.plugin.bukkit.util.player.User;
+import ml.karmaconfigs.api.common.string.StringUtils;
 import ml.karmaconfigs.api.common.utils.enums.Level;
-import ml.karmaconfigs.api.common.utils.string.StringUtils;
 import org.bukkit.Material;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.Player;
@@ -195,6 +197,7 @@ public final class PinInventory implements InventoryHolder {
                             session.set2FALogged(true);
 
                             SessionDataContainer.setLogged(SessionDataContainer.getLogged() + 1);
+                            TransientMap.apply(player);
                         }
 
                         close();
@@ -213,7 +216,7 @@ public final class PinInventory implements InventoryHolder {
                     updateInput();
                 } else {
                     String pinText = input.get(player.getUniqueId()).replaceAll("-", "");
-                    BungeeSender.sendPinInput(player, pinText);
+                    BungeeSender.sendPinInput(player, pinText, BungeeReceiver.proxies_map.get(player.getUniqueId()).toString());
 
                     input.put(player.getUniqueId(), "/-/-/-/");
                     updateInput();

@@ -16,14 +16,17 @@ package eu.locklogin.plugin.bungee.command;
 
 import eu.locklogin.api.account.AccountManager;
 import eu.locklogin.api.account.ClientSession;
+import eu.locklogin.api.common.utils.Channel;
 import eu.locklogin.api.common.utils.DataType;
 import eu.locklogin.api.encryption.CryptoFactory;
 import eu.locklogin.api.encryption.Validation;
 import eu.locklogin.api.file.PluginConfiguration;
 import eu.locklogin.api.file.PluginMessages;
 import eu.locklogin.api.util.platform.CurrentPlatform;
+import eu.locklogin.plugin.bungee.BungeeSender;
+import eu.locklogin.plugin.bungee.com.message.DataMessage;
 import eu.locklogin.plugin.bungee.command.util.SystemCommand;
-import eu.locklogin.plugin.bungee.plugin.sender.DataSender;
+import eu.locklogin.plugin.bungee.plugin.Manager;
 import eu.locklogin.plugin.bungee.util.player.User;
 import net.md_5.bungee.api.CommandSender;
 import net.md_5.bungee.api.connection.ProxiedPlayer;
@@ -35,6 +38,7 @@ import static eu.locklogin.plugin.bungee.LockLogin.console;
 import static eu.locklogin.plugin.bungee.LockLogin.properties;
 
 @SystemCommand(command = "pin")
+@SuppressWarnings("unused")
 public class PinCommand extends Command {
 
     /**
@@ -81,7 +85,9 @@ public class PinCommand extends Command {
 
                                             session.setPinLogged(false);
 
-                                            DataSender.send(player, DataSender.getBuilder(DataType.PIN, DataSender.CHANNEL_PLAYER, player).addTextData("open").build());
+                                            Manager.sendFunction.apply(DataMessage.newInstance(DataType.PIN, Channel.ACCOUNT, player)
+                                                    .addProperty("pin", true).getInstance(), BungeeSender.serverFromPlayer(player));
+
                                             CurrentPlatform.requestDataContainerUpdate();
                                         } else {
                                             user.send(messages.prefix() + messages.alreadyPin());

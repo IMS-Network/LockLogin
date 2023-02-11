@@ -5,7 +5,7 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import eu.locklogin.api.file.ProxyConfiguration;
 import eu.locklogin.api.util.platform.CurrentPlatform;
-import ml.karmaconfigs.api.common.karmafile.karmayaml.KarmaYamlManager;
+import ml.karmaconfigs.api.common.karma.file.yaml.KarmaYamlManager;
 
 import java.util.List;
 import java.util.Map;
@@ -77,26 +77,6 @@ public class RemoteProxy extends ProxyConfiguration {
     @Override
     public UUID getProxyID() {
         return UUID.fromString(manager.getString("ID", CurrentPlatform.getRealProxyConfiguration().getProxyID().toString()));
-    }
-
-    /**
-     * Get the proxy channel address
-     *
-     * @return the proxy channel address
-     */
-    @Override
-    public String messageAddress() {
-        return manager.getString("Channel.Address", CurrentPlatform.getRealProxyConfiguration().messageAddress());
-    }
-
-    /**
-     * Get the proxy channel port
-     *
-     * @return the proxy channel port
-     */
-    @Override
-    public int messagePort() {
-        return manager.getInt("Channel.Port", CurrentPlatform.getRealProxyConfiguration().messagePort());
     }
 
     /**

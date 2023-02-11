@@ -12,37 +12,36 @@ package eu.locklogin.plugin.bungee.util.player;
  */
 
 import eu.locklogin.api.account.AccountID;
-import eu.locklogin.api.account.AccountManager;
 import eu.locklogin.api.account.ClientSession;
 import eu.locklogin.api.common.security.google.GoogleAuthFactory;
-import eu.locklogin.api.common.session.PersistentSessionData;
 import eu.locklogin.api.common.session.SessionCheck;
+import eu.locklogin.api.common.utils.Channel;
 import eu.locklogin.api.common.utils.DataType;
 import eu.locklogin.api.common.utils.other.name.AccountNameDatabase;
 import eu.locklogin.api.file.PluginConfiguration;
 import eu.locklogin.api.file.PluginMessages;
 import eu.locklogin.api.file.ProxyConfiguration;
-import eu.locklogin.api.file.options.LoginConfig;
-import eu.locklogin.api.file.options.RegisterConfig;
 import eu.locklogin.api.module.plugin.api.event.user.SessionInitializationEvent;
 import eu.locklogin.api.module.plugin.api.event.util.Event;
 import eu.locklogin.api.module.plugin.client.permission.PermissionObject;
 import eu.locklogin.api.module.plugin.client.permission.plugin.PluginPermissions;
 import eu.locklogin.api.module.plugin.javamodule.ModulePlugin;
 import eu.locklogin.api.module.plugin.javamodule.sender.ModulePlayer;
-import eu.locklogin.api.util.enums.Manager;
+import eu.locklogin.api.util.enums.ManagerType;
 import eu.locklogin.api.util.platform.CurrentPlatform;
-import eu.locklogin.plugin.bungee.plugin.sender.DataSender;
+import eu.locklogin.plugin.bungee.BungeeSender;
+import eu.locklogin.plugin.bungee.com.message.DataMessage;
+import eu.locklogin.plugin.bungee.plugin.Manager;
 import eu.locklogin.plugin.bungee.util.files.Proxy;
 import ml.karmaconfigs.api.bungee.makeiteasy.BossMessage;
 import ml.karmaconfigs.api.bungee.makeiteasy.TitleMessage;
-import ml.karmaconfigs.api.common.boss.BossColor;
-import ml.karmaconfigs.api.common.boss.BossProvider;
-import ml.karmaconfigs.api.common.boss.ProgressiveBar;
-import ml.karmaconfigs.api.common.karma.APISource;
-import ml.karmaconfigs.api.common.karma.KarmaSource;
+import ml.karmaconfigs.api.common.karma.source.APISource;
+import ml.karmaconfigs.api.common.karma.source.KarmaSource;
+import ml.karmaconfigs.api.common.minecraft.boss.BossColor;
+import ml.karmaconfigs.api.common.minecraft.boss.BossProvider;
+import ml.karmaconfigs.api.common.minecraft.boss.ProgressiveBar;
+import ml.karmaconfigs.api.common.string.StringUtils;
 import ml.karmaconfigs.api.common.utils.enums.Level;
-import ml.karmaconfigs.api.common.utils.string.StringUtils;
 import net.md_5.bungee.api.ServerConnectRequest;
 import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.config.ServerInfo;
@@ -66,7 +65,7 @@ import static eu.locklogin.plugin.bungee.LockLogin.*;
 public final class User {
 
     private final static KarmaSource lockLogin = APISource.loadProvider("LockLogin");
-    private final static Map<UUID, AccountManager> managers = new ConcurrentHashMap<>();
+    private final static Map<UUID, eu.locklogin.api.account.AccountManager> managers = new ConcurrentHashMap<>();
     private final static Map<UUID, SessionCheck<ProxiedPlayer>> sessionChecks = new ConcurrentHashMap<>();
     @SuppressWarnings("FieldMayBeFinal") //This could be modified by the cache loader, so it can't be final
     private static Map<UUID, ClientSession> sessions = new ConcurrentHashMap<>();
@@ -86,7 +85,7 @@ public final class User {
         User loaded = UserDatabase.loadUser(player);
         if (loaded == null) {
             if (CurrentPlatform.isValidAccountManager()) {
-                AccountManager manager = CurrentPlatform.getAccountManager(Manager.CUSTOM, AccountID.fromUUID(player.getUniqueId()));
+                eu.locklogin.api.account.AccountManager manager = CurrentPlatform.getAccountManager(ManagerType.CUSTOM, AccountID.fromUUID(player.getUniqueId()));
 
                 if (manager == null) {
                     throw new IllegalStateException("Cannot initialize user with a null player account manager");
@@ -185,7 +184,7 @@ public final class User {
      * @param player the player
      * @return the player account manager
      */
-    public static AccountManager getManager(final ProxiedPlayer player) {
+    public static eu.locklogin.api.account.AccountManager getManager(final ProxiedPlayer player) {
         return managers.get(player.getUniqueId());
     }
 
@@ -340,28 +339,18 @@ public final class User {
      * types
      */
     public synchronized void applySessionEffects() {
-        PluginConfiguration config = CurrentPlatform.getConfiguration();
-        DataSender.MessageDataBuilder builder = DataSender.getBuilder(DataType.EFFECTS, DataSender.CHANNEL_PLAYER, player);
-        if (getManager().isRegistered()) {
-            LoginConfig login = config.loginOptions();
-
-            builder.addBoolData(login.blindEffect());
-        } else {
-            RegisterConfig register = config.registerOptions();
-
-            builder.addBoolData(register.blindEffect());
-        }
-
-        DataSender.send(player, builder.build());
+        Manager.sendFunction.apply(DataMessage.newInstance(DataType.EFFECTS, Channel.ACCOUNT, player)
+                .addProperty("effects", true).getInstance(),
+                BungeeSender.serverFromPlayer(player));
     }
 
     /**
      * Restore the player potion effects
      */
     public synchronized void restorePotionEffects() {
-        DataSender.MessageData data = DataSender.getBuilder(DataType.EFFECTS, DataSender.CHANNEL_PLAYER, player)
-                .addBoolData(false).build();
-        DataSender.send(player, data);
+        Manager.sendFunction.apply(DataMessage.newInstance(DataType.EFFECTS, Channel.ACCOUNT, player)
+                .addProperty("effects", false).getInstance(),
+                BungeeSender.serverFromPlayer(player));
     }
 
     /**
@@ -404,11 +393,13 @@ public final class User {
                 time = CurrentPlatform.getConfiguration().loginOptions().timeOut();
 
                 if (CurrentPlatform.getConfiguration().loginOptions().hasBossBar()) {
-                    message = new BossMessage(plugin, CurrentPlatform.getMessages().loginBar("&a", time), time).color(BossColor.GREEN).progress(ProgressiveBar.DOWN);
+                    message = new BossMessage(plugin, CurrentPlatform.getMessages().loginBar("&a", time), time)
+                            .color(BossColor.GREEN).progress(ProgressiveBar.DOWN);
                 }
             } else {
                 if (CurrentPlatform.getConfiguration().registerOptions().hasBossBar()) {
-                    message = new BossMessage(plugin, CurrentPlatform.getMessages().registerBar("&a", time), time).color(BossColor.GREEN).progress(ProgressiveBar.DOWN);
+                    message = new BossMessage(plugin, CurrentPlatform.getMessages().registerBar("&a", time), time)
+                            .color(BossColor.GREEN).progress(ProgressiveBar.DOWN);
                 }
             }
 
@@ -434,7 +425,7 @@ public final class User {
      * @return the player account manager
      */
     @NotNull
-    public AccountManager getManager() {
+    public eu.locklogin.api.account.AccountManager getManager() {
         return managers.get(player.getUniqueId());
     }
 

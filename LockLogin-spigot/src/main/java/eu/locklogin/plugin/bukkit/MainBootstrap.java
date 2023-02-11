@@ -3,6 +3,7 @@ package eu.locklogin.plugin.bukkit;
 import eu.locklogin.api.account.ClientSession;
 import eu.locklogin.api.common.JarManager;
 import eu.locklogin.api.common.security.AllowedCommand;
+import eu.locklogin.api.common.security.client.CommandProxy;
 import eu.locklogin.api.common.utils.FileInfo;
 import eu.locklogin.api.common.utils.dependencies.Dependency;
 import eu.locklogin.api.common.utils.dependencies.DependencyManager;
@@ -29,8 +30,8 @@ import ml.karmaconfigs.api.bukkit.server.BukkitServer;
 import ml.karmaconfigs.api.bukkit.server.Version;
 import ml.karmaconfigs.api.common.karma.KarmaAPI;
 import ml.karmaconfigs.api.common.karma.loader.BruteLoader;
+import ml.karmaconfigs.api.common.string.StringUtils;
 import ml.karmaconfigs.api.common.utils.enums.Level;
-import ml.karmaconfigs.api.common.utils.string.StringUtils;
 import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.entity.Player;
 import org.bukkit.permissions.Permission;
@@ -47,7 +48,6 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 import static eu.locklogin.plugin.bukkit.LockLogin.console;
-import static eu.locklogin.plugin.bukkit.LockLogin.plugin;
 
 public class MainBootstrap {
 
@@ -92,10 +92,10 @@ public class MainBootstrap {
         JarManager.downloadAll();
         DependencyManager.loadDependencies();
 
-        console.send("&aInjected plugin KarmaAPI version {0}, compiled at {1} for jdk {2}", KarmaAPI.getVersion(), KarmaAPI.getBuildDate(), KarmaAPI.getCompilerVersion());
+        /*console.send("&aInjected plugin KarmaAPI version {0}, compiled at {1} for jdk {2}", KarmaAPI.getVersion(), KarmaAPI.getBuildDate(), KarmaAPI.getCompilerVersion());
 
         STFetcher fetcher = new STFetcher();
-        fetcher.check();
+        fetcher.check();*/
 
         Consumer<MessageSender> onMessage = messageSender -> {
             if (messageSender.getSender() instanceof ModulePlayer) {
@@ -174,7 +174,11 @@ public class MainBootstrap {
 
             Player player = loader.getServer().getPlayer(id);
             if (player != null) {
-                player.performCommand("account close");
+                String cmd = "account close";
+                UUID cmd_id = CommandProxy.mask(cmd, "close");
+                String exec = CommandProxy.getCommand(cmd_id);
+
+                player.performCommand(exec + cmd_id + " ");
             }
         };
         Consumer<PermissionContainer> hasPermission = container -> {
@@ -208,7 +212,8 @@ public class MainBootstrap {
                 container.setResult(player.isOp() || player.hasPermission("*") || player.hasPermission("'*'"));
             }
         };
-        BiConsumer<String, byte[]> onDataSend = BungeeSender::sendModule;
+        @SuppressWarnings("unused")
+        BiConsumer<String, byte[]> onDataSend = BungeeSender::sendModule; //I may use this in a future
 
         try {
             JarManager.changeField(ModulePlayer.class, "onChat", onMessage);

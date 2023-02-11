@@ -8,7 +8,7 @@ import eu.locklogin.api.file.PluginConfiguration;
 import eu.locklogin.api.file.options.*;
 import eu.locklogin.api.util.enums.Lang;
 import eu.locklogin.api.util.platform.CurrentPlatform;
-import ml.karmaconfigs.api.common.karmafile.karmayaml.KarmaYamlManager;
+import ml.karmaconfigs.api.common.karma.file.yaml.KarmaYamlManager;
 
 import java.util.Map;
 
@@ -58,6 +58,36 @@ public class RemoteConfig extends PluginConfiguration {
     }
 
     /**
+     * Get if bedrock players login automatically
+     *
+     * @return if bedrock players log in automatically
+     */
+    @Override
+    public boolean bedrockLogin() {
+        return manager.getBoolean("BedrockLogin", CurrentPlatform.getConfiguration().bedrockLogin());
+    }
+
+    /**
+     * Get if the plugin share statistics with bStats
+     *
+     * @return if the plugin will share his statistics
+     */
+    @Override
+    public boolean shareBStats() {
+        return true;
+    }
+
+    /**
+     * Get if the plugin share statistics with official server
+     *
+     * @return if the plugin will share statistics wil official web server
+     */
+    @Override
+    public boolean sharePlugin() {
+        return true;
+    }
+
+    /**
      * Get if the plugin should replace the server MOTD while in
      * bungeecord mode
      *
@@ -77,6 +107,16 @@ public class RemoteConfig extends PluginConfiguration {
     @Override
     public String serverKey() {
         return manager.getString("ServerKey", CurrentPlatform.getServerHash());
+    }
+
+    /**
+     * Get the communication key
+     *
+     * @return the communication key
+     */
+    @Override
+    public String comKey() {
+        return manager.getString("BungeeKey", "");
     }
 
     /**
@@ -236,16 +276,23 @@ public class RemoteConfig extends PluginConfiguration {
     }
 
     /**
-     * Get if the plugin should block the player
-     * login/register when he has an invalid password.
-     * <p>
-     * Forcing him to change it until it's safe
+     * Get the permission configuration
      *
-     * @return if the plugin should block unsafe passwords
+     * @return the permission configuration
      */
     @Override
-    public boolean blockUnsafePasswords() {
-        return manager.getBoolean("BlockUnsafePasswords", CurrentPlatform.getRealConfiguration().blockUnsafePasswords());
+    public PermissionConfig permissionConfig() {
+        return null;
+    }
+
+    /**
+     * Get the password configuration
+     *
+     * @return the password configuration
+     */
+    @Override
+    public PasswordConfig passwordConfig() {
+        return null;
     }
 
     /**

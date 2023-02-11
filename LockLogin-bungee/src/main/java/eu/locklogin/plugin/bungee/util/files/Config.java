@@ -19,13 +19,13 @@ import eu.locklogin.api.file.PluginConfiguration;
 import eu.locklogin.api.file.options.*;
 import eu.locklogin.api.util.enums.Lang;
 import eu.locklogin.api.util.platform.CurrentPlatform;
-import ml.karmaconfigs.api.common.karmafile.karmayaml.FileCopy;
-import ml.karmaconfigs.api.common.karmafile.karmayaml.KarmaYamlManager;
-import ml.karmaconfigs.api.common.karmafile.karmayaml.YamlReloader;
-import ml.karmaconfigs.api.common.utils.string.RandomString;
-import ml.karmaconfigs.api.common.utils.string.StringUtils;
-import ml.karmaconfigs.api.common.utils.string.util.TextContent;
-import ml.karmaconfigs.api.common.utils.string.util.TextType;
+import ml.karmaconfigs.api.common.karma.file.yaml.FileCopy;
+import ml.karmaconfigs.api.common.karma.file.yaml.KarmaYamlManager;
+import ml.karmaconfigs.api.common.karma.file.yaml.YamlReloader;
+import ml.karmaconfigs.api.common.string.StringUtils;
+import ml.karmaconfigs.api.common.string.random.RandomString;
+import ml.karmaconfigs.api.common.string.text.TextContent;
+import ml.karmaconfigs.api.common.string.text.TextType;
 
 import java.io.File;
 
@@ -69,7 +69,7 @@ public final class Config extends PluginConfiguration {
     public String serverName() {
         String server_name = cfg.getString("ServerName", "");
         if (StringUtils.isNullOrEmpty(server_name)) {
-            server_name = StringUtils.generateString(
+            server_name = new RandomString(
                     RandomString.createBuilder()
                             .withType(TextType.ALL_LOWER)
                             .withContent(TextContent.ONLY_LETTERS)
@@ -86,6 +86,16 @@ public final class Config extends PluginConfiguration {
         }
 
         return server_name;
+    }
+
+    /**
+     * Get if bedrock players login automatically
+     *
+     * @return if bedrock players log in automatically
+     */
+    @Override
+    public boolean bedrockLogin() {
+        return cfg.getBoolean("BedrockLogin", false);
     }
 
     /**
@@ -108,6 +118,16 @@ public final class Config extends PluginConfiguration {
     @Override
     public String serverKey() {
         return cfg.getString("ServerKey", CurrentPlatform.getServerHash());
+    }
+
+    /**
+     * Get the communication key
+     *
+     * @return the communication key
+     */
+    @Override
+    public String comKey() {
+        return cfg.getString("BungeeKey", "");
     }
 
     @Override
@@ -284,16 +304,36 @@ public final class Config extends PluginConfiguration {
     }
 
     /**
-     * Get if the plugin should block the player
-     * login/register when he has an invalid password.
-     * <p>
-     * Forcing him to change it until it's safe
+     * Get the permission configuration
      *
-     * @return if the plugin should block unsafe passwords
+     * @return the permission configuration
      */
     @Override
-    public boolean blockUnsafePasswords() {
-        return cfg.getBoolean("BlockUnsafePasswords", true);
+    public PermissionConfig permissionConfig() {
+        return new PermissionConfig(
+                cfg.getBoolean("Permission.BlockOperator", true),
+                cfg.getBoolean("Permission.RemoveEverything", true),
+                cfg.getBoolean("Permission.AllowWildcard", false)
+        );
+    }
+
+    /**
+     * Get the password configuration
+     *
+     * @return the password configuration
+     */
+    @Override
+    public PasswordConfig passwordConfig() {
+        return new PasswordConfig(
+                cfg.getBoolean("Password.PrintSuccess", true),
+                cfg.getBoolean("Password.BlockUnsafe", true),
+                cfg.getBoolean("Password.WarnUnsafe", true),
+                cfg.getInt("Password.Safety.MinLength", 10),
+                cfg.getInt("Password.Safety.Characters", 1),
+                cfg.getInt("Password.Safety.Numbers", 2),
+                cfg.getInt("Password.Safety.Letters.Upper", 2),
+                cfg.getInt("Password.Safety.Letters.Lower", 5)
+        );
     }
 
     @Override
@@ -493,7 +533,7 @@ public final class Config extends PluginConfiguration {
             assert module_prefix != null;
 
             if (StringUtils.isNullOrEmpty(server_name)) {
-                server_name = StringUtils.generateString(
+                server_name = new RandomString(
                         RandomString.createBuilder()
                                 .withType(TextType.ALL_LOWER)
                                 .withContent(TextContent.ONLY_LETTERS)

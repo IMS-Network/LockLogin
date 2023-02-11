@@ -4,7 +4,7 @@ import com.google.common.io.ByteArrayDataInput;
 import ml.karmaconfigs.api.common.timer.SchedulerUnit;
 import ml.karmaconfigs.api.common.timer.SourceScheduler;
 import ml.karmaconfigs.api.common.timer.scheduler.SimpleScheduler;
-import ml.karmaconfigs.api.common.utils.TriConsumer;
+import ml.karmaconfigs.api.common.triple.consumer.TriConsumer;
 import org.bukkit.entity.Player;
 
 import java.util.Map;
@@ -37,6 +37,19 @@ public final class MessagePool {
             if (whenValidPlayer != null) {
                 whenValidPlayer.accept(channel, player, data);
             }
+        }
+    }
+
+    /**
+     * Trigger a valid player
+     *
+     * @param channel the message channel
+     * @param player  the player instance
+     * @param data    the message data
+     */
+    public static void trigger(final String channel, final Player player, final ByteArrayDataInput data) {
+        if (whenValidPlayer != null) {
+            whenValidPlayer.accept(channel, player, data);
         }
     }
 

@@ -16,7 +16,9 @@ package eu.locklogin.plugin.bungee.command;
 
 import eu.locklogin.api.account.AccountManager;
 import eu.locklogin.api.account.ClientSession;
-import eu.locklogin.api.common.security.Password;
+import eu.locklogin.api.file.options.PasswordConfig;
+import eu.locklogin.api.security.Password;
+import eu.locklogin.api.common.utils.Channel;
 import eu.locklogin.api.common.utils.DataType;
 import eu.locklogin.api.file.PluginConfiguration;
 import eu.locklogin.api.file.PluginMessages;
@@ -25,21 +27,24 @@ import eu.locklogin.api.module.plugin.api.event.util.Event;
 import eu.locklogin.api.module.plugin.client.permission.plugin.PluginPermissions;
 import eu.locklogin.api.module.plugin.javamodule.ModulePlugin;
 import eu.locklogin.api.util.platform.CurrentPlatform;
+import eu.locklogin.plugin.bungee.BungeeSender;
+import eu.locklogin.plugin.bungee.com.message.DataMessage;
 import eu.locklogin.plugin.bungee.command.util.SystemCommand;
-import eu.locklogin.plugin.bungee.plugin.sender.DataSender;
+import eu.locklogin.plugin.bungee.plugin.Manager;
 import eu.locklogin.plugin.bungee.util.player.User;
+import ml.karmaconfigs.api.common.string.StringUtils;
 import ml.karmaconfigs.api.common.utils.enums.Level;
-import ml.karmaconfigs.api.common.utils.string.StringUtils;
 import net.md_5.bungee.api.CommandSender;
 import net.md_5.bungee.api.connection.ProxiedPlayer;
 import net.md_5.bungee.api.plugin.Command;
 
 import java.util.List;
+import java.util.Map;
 
 import static eu.locklogin.plugin.bungee.LockLogin.*;
-import static eu.locklogin.plugin.bungee.plugin.sender.DataSender.CHANNEL_PLAYER;
 
 @SystemCommand(command = "register", aliases = {"reg"})
+@SuppressWarnings("unused")
 public final class RegisterCommand extends Command {
 
     /**
@@ -90,15 +95,36 @@ public final class RegisterCommand extends Command {
                                     String confirmation = args[1];
 
                                     if (password.equals(confirmation)) {
-                                        Password checker = new Password(password);
-                                        checker.addInsecure(player.getDisplayName(), player.getName(), StringUtils.stripColor(player.getDisplayName()), StringUtils.stripColor(player.getName()));
+                                        Password tmp = new Password(null);
+                                        tmp.addInsecure(player.getDisplayName(), player.getName(), StringUtils.stripColor(player.getDisplayName()), StringUtils.stripColor(player.getName()));
+                                        PasswordConfig passwordConfig = config.passwordConfig();
+                                        Map.Entry<Boolean, String[]> rs = passwordConfig.check(password);
 
-                                        if (!checker.isSecure()) {
+                                        if (!rs.getKey()) {
+                                            boolean ret = false;
                                             user.send(messages.prefix() + messages.passwordInsecure());
 
-                                            if (config.blockUnsafePasswords()) {
-                                                return;
+                                            if (passwordConfig.block_unsafe()) {
+                                                ret = true;
+                                            } else {
+                                                if (passwordConfig.warn_unsafe()) {
+                                                    for (ProxiedPlayer online : plugin.getProxy().getPlayers()) {
+                                                        User staff = new User(online);
+                                                        if (staff.hasPermission(PluginPermissions.warn_unsafe())) {
+                                                            staff.send(messages.prefix() + messages.passwordWarning());
+                                                        }
+                                                    }
+                                                }
                                             }
+
+                                            if (passwordConfig.warn_unsafe()) {
+                                                for (String msg : rs.getValue()) {
+                                                    if (msg != null)
+                                                        user.send(msg);
+                                                }
+                                            }
+
+                                            if (ret) return;
                                         }
 
                                         manager.setPassword(password);
@@ -121,16 +147,21 @@ public final class RegisterCommand extends Command {
 
                                         user.restorePotionEffects();
 
-                                        DataSender.MessageData login = DataSender.getBuilder(DataType.SESSION, CHANNEL_PLAYER, player).build();
-                                        DataSender.MessageData pin = DataSender.getBuilder(DataType.PIN, CHANNEL_PLAYER, player).addTextData("close").build();
-                                        DataSender.MessageData gauth = DataSender.getBuilder(DataType.GAUTH, CHANNEL_PLAYER, player).build();
+                                        if (session.isPinLogged()) {
+                                            Manager.sendFunction.apply(DataMessage.newInstance(DataType.SESSION, Channel.ACCOUNT, player)
+                                                    .getInstance(),
+                                                    BungeeSender.serverFromPlayer(player));
+                                        }
 
-                                        DataSender.send(player, login);
+                                        if (session.is2FALogged()) {
+                                            Manager.sendFunction.apply(DataMessage.newInstance(DataType.PIN, Channel.ACCOUNT, player)
+                                                    .addProperty("pin", false).getInstance(),
+                                                    BungeeSender.serverFromPlayer(player));
+                                        }
 
-                                        if (session.isPinLogged())
-                                            DataSender.send(player, pin);
-                                        if (session.is2FALogged())
-                                            DataSender.send(player, gauth);
+                                        Manager.sendFunction.apply(DataMessage.newInstance(DataType.GAUTH, Channel.ACCOUNT, player)
+                                                .getInstance(),
+                                                BungeeSender.serverFromPlayer(player));
 
                                         user.checkServer(0);
 
@@ -159,7 +190,10 @@ public final class RegisterCommand extends Command {
                                         session.setCaptchaLogged(true);
 
                                         user.performCommand("register " + password + " " + confirmation);
-                                        DataSender.send(player, DataSender.getBuilder(DataType.CAPTCHA, DataSender.CHANNEL_PLAYER, player).build());
+
+                                        Manager.sendFunction.apply(DataMessage.newInstance(DataType.CAPTCHA, Channel.ACCOUNT, player)
+                                                .getInstance(),
+                                                BungeeSender.serverFromPlayer(player));
                                     } else {
                                         user.send(messages.prefix() + messages.invalidCaptcha());
                                     }

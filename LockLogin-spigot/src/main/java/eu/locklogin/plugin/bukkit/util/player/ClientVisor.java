@@ -15,14 +15,16 @@ package eu.locklogin.plugin.bukkit.util.player;
  */
 
 import eu.locklogin.api.account.ClientSession;
+import eu.locklogin.plugin.bukkit.TaskTarget;
 import ml.karmaconfigs.api.common.timer.SchedulerUnit;
 import ml.karmaconfigs.api.common.timer.SourceScheduler;
 import ml.karmaconfigs.api.common.timer.scheduler.SimpleScheduler;
 import org.bukkit.entity.Player;
 
-import java.util.*;
+import java.util.UUID;
 
 import static eu.locklogin.plugin.bukkit.LockLogin.plugin;
+import static eu.locklogin.plugin.bukkit.LockLogin.trySync;
 
 /**
  * Client visor class.
@@ -135,11 +137,13 @@ public final class ClientVisor {
      * @param target the target player
      */
     private void hide(final Player origin, final Player target) {
-        try {
-            origin.hidePlayer(target);
-        } catch (Throwable ex) {
-            origin.hidePlayer(plugin, target);
-        }
+        trySync(TaskTarget.VISION_TOGGLE, () -> {
+            try {
+                origin.hidePlayer(target);
+            } catch (Throwable ex) {
+                origin.hidePlayer(plugin, target);
+            }
+        });
     }
 
     /**
@@ -149,11 +153,13 @@ public final class ClientVisor {
      * @param target the target player
      */
     private void show(final Player origin, final Player target) {
-        try {
-            origin.showPlayer(target);
-        } catch (Throwable ex) {
-            //Thanks spigot :)
-            origin.showPlayer(plugin, target);
-        }
+        trySync(TaskTarget.VISION_TOGGLE, () -> {
+            try {
+                origin.showPlayer(target);
+            } catch (Throwable ex) {
+                //Thanks spigot :)
+                origin.showPlayer(plugin, target);
+            }
+        });
     }
 }

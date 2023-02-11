@@ -1,16 +1,22 @@
 package eu.locklogin.api.common.utils;
 
+import eu.locklogin.api.file.PluginConfiguration;
 import eu.locklogin.api.util.enums.UpdateChannel;
-import ml.karmaconfigs.api.common.karmafile.karmayaml.KarmaYamlManager;
-import ml.karmaconfigs.api.common.utils.url.HttpUtil;
+import eu.locklogin.api.util.platform.CurrentPlatform;
+import ml.karmaconfigs.api.common.karma.file.yaml.KarmaYamlManager;
+import ml.karmaconfigs.api.common.karma.source.APISource;
+import ml.karmaconfigs.api.common.karma.source.KarmaSource;
+import ml.karmaconfigs.api.common.timer.SchedulerUnit;
+import ml.karmaconfigs.api.common.timer.SourceScheduler;
+import ml.karmaconfigs.api.common.utils.enums.Level;
 import ml.karmaconfigs.api.common.utils.url.URLUtils;
 
-import java.io.*;
-import java.net.HttpURLConnection;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.InputStream;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
-import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -27,7 +33,13 @@ import java.util.zip.ZipFile;
  * as the successor of the GNU Library Public License, version 2, hence
  * the version number 2.1.]
  */
+@SuppressWarnings("unused")
 public class FileInfo {
+
+    private static boolean adviced = false;
+
+    private final static Set<String> invalid_hosts = new HashSet<>();
+    private final static KarmaSource plugin = APISource.loadProvider("LockLogin");
 
     /**
      * Get the global internal file
@@ -112,6 +124,38 @@ public class FileInfo {
         if (global != null) {
             KarmaYamlManager manager = new KarmaYamlManager(global);
             return manager.getString("project_version", "1.0.0");
+        }
+
+        return "1.0.0";
+    }
+
+    /**
+     * Get the specified jar file version
+     *
+     * @param target the file to read from
+     * @return the jar file LockLogin version
+     */
+    public static String getKarmaVersion(final File target) {
+        InputStream global = getGlobal(target);
+        if (global != null) {
+            KarmaYamlManager manager = new KarmaYamlManager(global);
+            return manager.getString("project_karmaapi", "1.0.0");
+        }
+
+        return "1.0.0";
+    }
+
+    /**
+     * Get the specified jar file version
+     *
+     * @param target the file to read from
+     * @return the jar file LockLogin version
+     */
+    public static String getKarmaPluginVersion(final File target) {
+        InputStream global = getGlobal(target);
+        if (global != null) {
+            KarmaYamlManager manager = new KarmaYamlManager(global);
+            return manager.getString("project_karmaapi_min", "1.0.0");
         }
 
         return "1.0.0";
@@ -252,7 +296,6 @@ public class FileInfo {
                         domains.add(url + data.getString("checksum").replace("{0}", checksumVersion));
                         for (String alt : data.getStringList("alternative")) {
                             url = url.replace(domain + "." + ext, alt + "." + domain + "." + ext);
-
                             domains.add(url + data.getString("checksum").replace("{0}", checksumVersion));
                         }
                     });
@@ -260,13 +303,28 @@ public class FileInfo {
             }
 
             for (String url : domains) {
-                int response_code = URLUtils.getResponseCode(url);
-                if (response_code == 200)
-                    try {
-                        return new URL(url);
-                    } catch (Throwable ex) {
-                        ex.printStackTrace();
+                if (!invalid_hosts.contains(URLUtils.getDomainName(url))) {
+                    int response_code = URLUtils.getResponseCode(url);
+                    if (response_code < 300) {
+                        try {
+                            return new URL(url);
+                        } catch (Throwable ex) {
+                            ex.printStackTrace();
+                        }
+                    } else {
+                        if (response_code >= 500) {
+                            //Only for server errors
+                            String domain = URLUtils.getDomainName(url);
+
+                            if (domain != null) {
+                                plugin.console().send("Invalidating temporally host {0} at request {1} [CODE: {2}]", Level.INFO, domain, url, response_code);
+                                invalid_hosts.add(domain);
+                                SourceScheduler scheduler = new SourceScheduler(plugin, 5, SchedulerUnit.MINUTE, false);
+                                scheduler.endAction(() -> invalid_hosts.remove(URLUtils.getDomainName(url))).start();
+                            }
+                        }
                     }
+                }
             }
         }
 
@@ -282,8 +340,26 @@ public class FileInfo {
     public static URL versionHost(final File target) {
         InputStream global = getGlobal(target);
         if (global != null) {
+            PluginConfiguration configuration = CurrentPlatform.getConfiguration();
+            UpdateChannel config_channel = UpdateChannel.SNAPSHOT; //Always expect lowlevel by default
+            if (configuration != null) {
+                config_channel = configuration.getUpdaterOptions().getChannel();
+            }
+
             KarmaYamlManager manager = new KarmaYamlManager(global);
             UpdateChannel channel = UpdateChannel.valueOf(manager.getString("project_build", "RELEASE").toUpperCase());
+
+            switch (channel) {
+                case RELEASE:
+                    break;
+                case RC:
+                case SNAPSHOT:
+                    if (config_channel.equals(UpdateChannel.RELEASE) && !adviced) {
+                        adviced = true;
+                        plugin.console().send("Cannot upgrade version channel using config (May break plugin). Please download the latest stable version or wait until the stable version gets released", Level.INFO);
+                    }
+                    break;
+            }
 
             KarmaYamlManager defaults = new KarmaYamlManager(new HashMap<>());
             defaults.set("ml.karmaconfigs.safe", true);
@@ -324,22 +400,39 @@ public class FileInfo {
                         }
 
                         url = url + domain + "." + ext + domainDirectory;
-                        domains.add(url + data.getString("version") + channel.webName() + ".kupdter");
+                        domains.add(url + data.getString("version") + channel.webName() + ".kup");
                         for (String alt : data.getStringList("alternative")) {
                             url = url.replace(domain + "." + ext, alt + "." + domain + "." + ext);
 
-                            domains.add(url + data.getString("version") + channel.webName() + ".kupdter");
+                            domains.add(url + data.getString("version") + channel.webName() + ".kup");
                         }
                     });
                 }
             }
 
             for (String url : domains) {
-                int response_code = URLUtils.getResponseCode(url);
-                if (response_code == 200)
-                    try {
-                        return new URL(url);
-                    } catch (Throwable ignored) {}
+                if (!invalid_hosts.contains(URLUtils.getDomainName(url))) {
+                    int response_code = URLUtils.getResponseCode(url);
+                    if (response_code < 300) {
+                        try {
+                            return new URL(url);
+                        } catch (Throwable ex) {
+                            ex.printStackTrace();
+                        }
+                    } else {
+                        if (response_code >= 500) {
+                            //Only for server errors
+                            String domain = URLUtils.getDomainName(url);
+
+                            if (domain != null) {
+                                plugin.console().send("Invalidating temporally host {0} at request {1} [CODE: {2}]", Level.INFO, domain, url, response_code);
+                                invalid_hosts.add(domain);
+                                SourceScheduler scheduler = new SourceScheduler(plugin, 5, SchedulerUnit.MINUTE, false);
+                                scheduler.endAction(() -> invalid_hosts.remove(URLUtils.getDomainName(url))).start();
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -410,11 +503,28 @@ public class FileInfo {
             }
 
             for (String url : domains) {
-                int response_code = URLUtils.getResponseCode(url);
-                if (response_code == 200)
-                    try {
-                        return new URL(url);
-                    } catch (Throwable ignored) {}
+                if (!invalid_hosts.contains(URLUtils.getDomainName(url))) {
+                    int response_code = URLUtils.getResponseCode(url);
+                    if (response_code < 300) {
+                        try {
+                            return new URL(url);
+                        } catch (Throwable ex) {
+                            ex.printStackTrace();
+                        }
+                    } else {
+                        if (response_code >= 500) {
+                            //Only for server errors
+                            String domain = URLUtils.getDomainName(url);
+
+                            if (domain != null) {
+                                plugin.console().send("Invalidating temporally host {0} at request {1} [CODE: {2}]", Level.INFO, domain, url, response_code);
+                                invalid_hosts.add(domain);
+                                SourceScheduler scheduler = new SourceScheduler(plugin, 5, SchedulerUnit.MINUTE, false);
+                                scheduler.endAction(() -> invalid_hosts.remove(URLUtils.getDomainName(url))).start();
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -483,11 +593,28 @@ public class FileInfo {
             }
 
             for (String url : domains) {
-                int response_code = URLUtils.getResponseCode(url);
-                if (response_code == 200)
-                    try {
-                        return new URL(url);
-                    } catch (Throwable ignored) {}
+                if (!invalid_hosts.contains(URLUtils.getDomainName(url))) {
+                    int response_code = URLUtils.getResponseCode(url);
+                    if (response_code < 300) {
+                        try {
+                            return new URL(url);
+                        } catch (Throwable ex) {
+                            ex.printStackTrace();
+                        }
+                    } else {
+                        if (response_code >= 500) {
+                            //Only for server errors
+                            String domain = URLUtils.getDomainName(url);
+
+                            if (domain != null) {
+                                plugin.console().send("Invalidating temporally host {0} at request {1} [CODE: {2}]", Level.INFO, domain, url, response_code);
+                                invalid_hosts.add(domain);
+                                SourceScheduler scheduler = new SourceScheduler(plugin, 5, SchedulerUnit.MINUTE, false);
+                                scheduler.endAction(() -> invalid_hosts.remove(URLUtils.getDomainName(url))).start();
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -495,26 +622,91 @@ public class FileInfo {
     }
 
     /**
-     * Get the host for LockLogin web editor
+     * Get hosts LockLoginManager will be downloaded from
      *
      * @param target the file to read from
-     * @return the LockLogin web editor host
+     * @return the LockLoginManager download source
      */
-    public static URL getEditorURL(final File target) {
+    public static URL managerHost(final File target) {
         InputStream global = getGlobal(target);
         if (global != null) {
             KarmaYamlManager manager = new KarmaYamlManager(global);
-            List<String> domains = manager.getStringList("editor_urls",
-                    "https://panel.karmaconfigs.ml/editor/",
-                    "https://panel.karmarepo.ml/editor/",
-                    "https://panel.karmadev.es/editor/");
+            String currentChannel = getManagerVersion(target);
+
+            KarmaYamlManager defaults = new KarmaYamlManager(new HashMap<>());
+            defaults.set("ml.karmaconfigs.safe", true);
+            defaults.set("ml.karmaconfigs.target", "/locklogin/");
+            defaults.set("ml.karmaconfigs.manager", "-repository/manager/{0}/LockLoginManager.jar");
+            defaults.set("ml.karmaconfigs.alternative", Collections.singletonList("backup"));
+
+            defaults.set("ml.karmarepo.safe", true);
+            defaults.set("ml.karmarepo.target", "/locklogin/");
+            defaults.set("ml.karmarepo.manager", "-repository/manager/{0}/LockLoginManager.jar");
+            defaults.set("ml.karmarepo.alternative", Collections.singletonList("backup"));
+
+            defaults.set("es.karmadev.safe", true);
+            defaults.set("es.karmadev.target", "/locklogin/");
+            defaults.set("ml.karmadev.manager", "-repository/manager/{0}/LockLoginManager.jar");
+            defaults.set("es.karmadev.alternative", Collections.singletonList("backup"));
+
+            defaults.set("io.github.safe", true);
+            defaults.set("io.github.target", "/karmaconfigs/updates/LockLogin/");
+            defaults.set("io.github.manager", "modules/manager/{0}/LockLoginManager.jar");
+            defaults.set("io.github.alternative", Collections.emptyList());
+
+            KarmaYamlManager section = manager.getSection("project_urls", defaults);
+            Set<String> keys = section.getKeySet();
+
+            Set<String> domains = new LinkedHashSet<>();
+            for (String ext : keys) {
+                KarmaYamlManager extension = section.getSection(ext);
+                if (extension.getKeySet().size() > 0) {
+                    extension.getKeySet().forEach((domain) -> {
+                        KarmaYamlManager data = extension.getSection(domain);
+                        boolean overHttps = data.getBoolean("safe");
+                        String domainDirectory = data.getString("target");
+
+                        String url = "http://";
+                        if (overHttps) {
+                            url = "https://";
+                        }
+
+                        url = url + domain + "." + ext + domainDirectory;
+                        domains.add(url + data.getString("manager").replace("{0}", currentChannel));
+                        for (String alt : data.getStringList("alternative")) {
+                            url = url.replace(domain + "." + ext, alt + "." + domain + "." + ext);
+
+                            domains.add(url + data.getString("manager").replace("{0}", currentChannel));
+                        }
+                    });
+                }
+            }
 
             for (String url : domains) {
-                int response_code = URLUtils.getResponseCode(url);
-                if (response_code == 200)
-                    try {
-                        return new URL(url);
-                    } catch (Throwable ignored) {}
+                if (!invalid_hosts.contains(URLUtils.getDomainName(url))) {
+                    int response_code = URLUtils.getResponseCode(url);
+                    if (response_code < 300) {
+                        try {
+                            return new URL(url);
+                        } catch (Throwable ex) {
+                            ex.printStackTrace();
+                        }
+                    } else {
+                        if (response_code >= 500) {
+                            //Only for server errors
+                            String domain = URLUtils.getDomainName(url);
+
+                            if (domain != null) {
+                                plugin.console().send("Invalidating temporally host {0} at request {1} [CODE: {2}]", Level.INFO, domain, url, response_code);
+                                invalid_hosts.add(domain);
+                                SourceScheduler scheduler = new SourceScheduler(plugin, 5, SchedulerUnit.MINUTE, false);
+                                scheduler.endAction(() -> invalid_hosts.remove(URLUtils.getDomainName(url))).start();
+                            }
+                        }
+                        //Basically a "Come back in a few minutes". This will save a lot of time when retrieving a host, even if
+                        //some of them fail.
+                    }
+                }
             }
         }
 

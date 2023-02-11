@@ -2,14 +2,15 @@ package eu.locklogin.module.manager;
 
 import eu.locklogin.api.account.AccountID;
 import eu.locklogin.api.account.AccountManager;
-import eu.locklogin.api.common.session.SessionDataContainer;
+import eu.locklogin.api.common.session.online.SessionDataContainer;
 import eu.locklogin.api.module.plugin.api.event.ModuleEventHandler;
 import eu.locklogin.api.module.plugin.api.event.user.*;
 import eu.locklogin.api.module.plugin.api.event.util.EventListener;
 import eu.locklogin.api.module.plugin.javamodule.sender.ModulePlayer;
 import eu.locklogin.api.util.platform.CurrentPlatform;
-import ml.karmaconfigs.api.common.utils.string.StringUtils;
+import ml.karmaconfigs.api.common.string.StringUtils;
 
+@SuppressWarnings("unused")
 public class UsersListener implements EventListener {
 
     @ModuleEventHandler(priority = ModuleEventHandler.Priority.FIRST)

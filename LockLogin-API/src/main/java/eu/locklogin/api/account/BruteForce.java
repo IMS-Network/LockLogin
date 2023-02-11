@@ -4,15 +4,17 @@ import eu.locklogin.api.encryption.CryptoFactory;
 import eu.locklogin.api.encryption.HashType;
 import eu.locklogin.api.encryption.Validation;
 import eu.locklogin.api.module.plugin.javamodule.sender.ModulePlayer;
-import ml.karmaconfigs.api.common.karma.APISource;
-import ml.karmaconfigs.api.common.karmafile.KarmaFile;
-import ml.karmaconfigs.api.common.karmafile.Key;
-import ml.karmaconfigs.api.common.utils.string.StringUtils;
+import ml.karmaconfigs.api.common.karma.file.KarmaMain;
+import ml.karmaconfigs.api.common.karma.file.element.KarmaPrimitive;
+import ml.karmaconfigs.api.common.karma.file.element.types.Element;
+import ml.karmaconfigs.api.common.karma.file.element.types.ElementPrimitive;
+import ml.karmaconfigs.api.common.karma.source.APISource;
+import ml.karmaconfigs.api.common.string.StringUtils;
+import ml.karmaconfigs.api.common.string.random.RandomString;
 
 import java.net.InetAddress;
 import java.time.Instant;
 import java.time.ZonedDateTime;
-import java.util.Random;
 
 /*
  * GNU LESSER GENERAL PUBLIC LICENSE
@@ -33,7 +35,7 @@ import java.util.Random;
  */
 public final class BruteForce extends BruteForceProvider {
 
-    private final KarmaFile data;
+    private final KarmaMain data;
 
     /**
      * Initialize the brute force provider
@@ -44,7 +46,7 @@ public final class BruteForce extends BruteForceProvider {
     public BruteForce(ModulePlayer player, InetAddress ip) {
         super(player, ip);
 
-        data = new KarmaFile(APISource.loadProvider("LockLogin"), player.getUUID().toString(), "data", "locked");
+        data = new KarmaMain(APISource.loadProvider("LockLogin"), player.getUUID().toString() + ".kf", "data", "locked");
     }
 
     /**
@@ -54,7 +56,7 @@ public final class BruteForce extends BruteForceProvider {
     public void fail() {
         ZonedDateTime dateTime = ZonedDateTime.now();
 
-        data.set(getAddress().getHostAddress(), dateTime.plusDays(1).toInstant().toString());
+        data.setRaw(getAddress().getHostAddress(), dateTime.plusDays(1).toInstant());
     }
 
     /**
@@ -64,15 +66,11 @@ public final class BruteForce extends BruteForceProvider {
      */
     @Override
     public void setPanicStatus(final boolean status) {
-        data.set("PANIC", status);
+        data.setRaw("panic", status);
 
-        for (Key key : data.getKeys(false)) {
-            if (!key.getPath().equalsIgnoreCase("panic")) {
-                if (data.isList(key.getPath())) {
-                    data.unsetList(key.getPath());
-                } else {
-                    data.unset(key.getPath());
-                }
+        for (String key : data.getKeys()) {
+            if (!key.equalsIgnoreCase("panic")) {
+                data.set(key, null);
             }
         }
     }
@@ -84,7 +82,13 @@ public final class BruteForce extends BruteForceProvider {
      */
     @Override
     public boolean isInPanic() {
-        return data.getBoolean("PANIC", false);
+        Element<?> element = data.get("panic");
+        if (element.isPrimitive()) {
+            ElementPrimitive primitive = element.getAsPrimitive();
+            if (primitive.isBoolean()) return primitive.asBoolean();
+        }
+
+        return false;
     }
 
     /**
@@ -101,13 +105,7 @@ public final class BruteForce extends BruteForceProvider {
                     .withPassword(token)
                     .build();
 
-            HashType[] types = HashType.values();
-            int random = new Random().nextInt(types.length);
-            if (random == types.length) {
-                random = random - 1;
-            }
-
-            data.set("TOKEN", factory.hash(types[random], true));
+            data.setRaw("token", factory.hash(HashType.pickRandom(), true));
 
             return token;
         }
@@ -123,7 +121,7 @@ public final class BruteForce extends BruteForceProvider {
     @Override
     public String success() {
         setPanicStatus(false);
-        data.unset("TOKEN");
+        data.set("token", null);
 
         return createToken();
     }
@@ -136,10 +134,10 @@ public final class BruteForce extends BruteForceProvider {
      */
     @Override
     public boolean validate(final String token) {
-        CryptoFactory factory = CryptoFactory.getBuilder().
-                withPassword(token).
-                withToken(data.getString("TOKEN", StringUtils.generateString().create())).
-                build();
+        CryptoFactory factory = CryptoFactory.getBuilder()
+                .withPassword(token)
+                .withToken(data.get(token, new KarmaPrimitive(new RandomString().create())))
+                .build();
 
         return factory.validate(Validation.MODERN);
     }
@@ -151,12 +149,18 @@ public final class BruteForce extends BruteForceProvider {
      */
     @Override
     public boolean canJoin() {
-        String ipData = data.getString(getAddress().getHostAddress(), "");
-        if (!StringUtils.isNullOrEmpty(ipData)) {
-            Instant now = Instant.now();
-            Instant time = Instant.parse(data.getString(getAddress().getHostAddress(), now.toString()));
+        Element<?> ip_data = data.get(getAddress().getHostAddress(), new KarmaPrimitive(""));
+        if (ip_data.isPrimitive()) {
+            ElementPrimitive primitive = ip_data.getAsPrimitive();
+            if (primitive.isString()) {
+                String data = ip_data.getAsString();
+                if (!StringUtils.isNullOrEmpty(data)) {
+                    Instant now = Instant.now();
+                    Instant time = Instant.parse(data);
 
-            return now.isAfter(time);
+                    return now.isAfter(time);
+                }
+            }
         }
 
         return true;

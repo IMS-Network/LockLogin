@@ -14,7 +14,6 @@ package eu.locklogin.api.util.platform;
  * the version number 2.1.]
  */
 
-import eu.locklogin.api.account.AccountManager;
 import eu.locklogin.api.account.ClientSession;
 import eu.locklogin.api.account.param.AccountConstructor;
 import eu.locklogin.api.encryption.libraries.sha.SHA512;
@@ -23,20 +22,19 @@ import eu.locklogin.api.file.PluginMessages;
 import eu.locklogin.api.file.ProxyConfiguration;
 import eu.locklogin.api.module.plugin.javamodule.sender.ModulePlayer;
 import eu.locklogin.api.module.plugin.javamodule.server.TargetServer;
-import eu.locklogin.api.util.enums.Manager;
-import ml.karmaconfigs.api.common.Logger;
-import ml.karmaconfigs.api.common.karma.APISource;
-import ml.karmaconfigs.api.common.karma.KarmaSource;
+import eu.locklogin.api.util.enums.ManagerType;
 import ml.karmaconfigs.api.common.karma.file.KarmaMain;
-import ml.karmaconfigs.api.common.karma.file.element.KarmaElement;
-import ml.karmaconfigs.api.common.karma.file.element.KarmaObject;
+import ml.karmaconfigs.api.common.karma.file.element.KarmaPrimitive;
+import ml.karmaconfigs.api.common.karma.file.element.types.Element;
 import ml.karmaconfigs.api.common.karma.loader.BruteLoader;
-import ml.karmaconfigs.api.common.utils.KarmaLogger;
+import ml.karmaconfigs.api.common.karma.source.APISource;
+import ml.karmaconfigs.api.common.karma.source.KarmaSource;
+import ml.karmaconfigs.api.common.logger.KarmaLogger;
+import ml.karmaconfigs.api.common.logger.Logger;
+import ml.karmaconfigs.api.common.string.random.RandomString;
+import ml.karmaconfigs.api.common.string.text.TextContent;
+import ml.karmaconfigs.api.common.string.text.TextType;
 import ml.karmaconfigs.api.common.utils.enums.Level;
-import ml.karmaconfigs.api.common.utils.string.RandomString;
-import ml.karmaconfigs.api.common.utils.string.StringUtils;
-import ml.karmaconfigs.api.common.utils.string.util.TextContent;
-import ml.karmaconfigs.api.common.utils.string.util.TextType;
 import org.jetbrains.annotations.Nullable;
 
 import java.lang.reflect.Constructor;
@@ -66,9 +64,9 @@ public final class CurrentPlatform {
         try {
             KarmaMain kf = new KarmaMain(plugin, "server.cfg", "cache", "locklogin");
 
-            KarmaElement tmp_hash = kf.get("hash");
-            if (tmp_hash == null || tmp_hash.isString() && StringUtils.isNullOrEmpty(tmp_hash.getObjet().getString().isEmpty()) || !tmp_hash.isString()) {
-                tmp_hash = new KarmaObject(Base64.getEncoder().encodeToString(new SHA512().hash(StringUtils.generateString(
+            Element<?> tmp_hash = kf.get("hash");
+            if (!tmp_hash.isPrimitive() || !tmp_hash.getAsPrimitive().isString()) {
+                tmp_hash = new KarmaPrimitive(Base64.getEncoder().encodeToString(new SHA512().hash(new RandomString(
                         RandomString.createBuilder()
                                 .withContent(TextContent.NUMBERS_AND_LETTERS)
                                 .withType(TextType.RANDOM_SIZE)
@@ -79,12 +77,12 @@ public final class CurrentPlatform {
                 kf.save();
             }
 
-            hash = tmp_hash.getObjet().getString();
+            hash = tmp_hash.getAsString();
         } catch (Throwable ex) {
             plugin.logger().scheduleLog(Level.GRAVE, ex);
             plugin.logger().scheduleLog(Level.INFO, "Failed to load server hash");
 
-            hash = Base64.getEncoder().encodeToString(new SHA512().hash(StringUtils.generateString(
+            hash = Base64.getEncoder().encodeToString(new SHA512().hash(new RandomString(
                     RandomString.createBuilder()
                             .withContent(TextContent.NUMBERS_AND_LETTERS)
                             .withType(TextType.RANDOM_SIZE)
@@ -101,12 +99,14 @@ public final class CurrentPlatform {
     private static Platform platform;
     private static Class<?> main;
     private static String prefix = "$";
-    private static Class<? extends AccountManager> manager;
-    private static Class<? extends AccountManager> default_manager;
-    private static Class<? extends AccountManager> last_manager;
+    private static Class<? extends eu.locklogin.api.account.AccountManager> manager;
+    private static Class<? extends eu.locklogin.api.account.AccountManager> default_manager;
+    private static Class<? extends eu.locklogin.api.account.AccountManager> last_manager;
     private static Class<? extends ClientSession> sessionManager;
 
+    @SuppressWarnings("unused")
     private static PluginConfiguration fake_config;
+    @SuppressWarnings("unused")
     private static ProxyConfiguration fake_proxy;
 
     private static PluginConfiguration current_config;
@@ -122,7 +122,7 @@ public final class CurrentPlatform {
      *
      * @param clazz the account manager class
      */
-    public static void setAccountsManager(final Class<? extends AccountManager> clazz) {
+    public static void setAccountsManager(final Class<? extends eu.locklogin.api.account.AccountManager> clazz) {
         if (default_manager == null)
             default_manager = manager;
 
@@ -210,6 +210,7 @@ public final class CurrentPlatform {
      *
      * @param sv the server to add
      */
+    @SuppressWarnings("unused")
     public static void detectServer(final TargetServer sv) {
         server.addServer(sv);
     }
@@ -273,7 +274,7 @@ public final class CurrentPlatform {
      * @return if the current account manager is valid
      */
     public static boolean isValidAccountManager() {
-        return manager != null && AccountManager.class.isAssignableFrom(manager);
+        return manager != null && eu.locklogin.api.account.AccountManager.class.isAssignableFrom(manager);
     }
 
     /**
@@ -296,8 +297,8 @@ public final class CurrentPlatform {
      * @throws IllegalStateException if the manager type is unknown
      */
     @Nullable
-    public static AccountManager getAccountManager(final Manager type, final @Nullable AccountConstructor<?> parameter) throws IllegalStateException {
-        Class<? extends AccountManager> clazz;
+    public static eu.locklogin.api.account.AccountManager getAccountManager(final ManagerType type, final @Nullable AccountConstructor<?> parameter) throws IllegalStateException {
+        Class<? extends eu.locklogin.api.account.AccountManager> clazz;
         switch (type) {
             case DEFAULT:
                 clazz = default_manager;
@@ -325,12 +326,12 @@ public final class CurrentPlatform {
         }
 
         try {
-            Constructor<? extends AccountManager> constructor = clazz.getDeclaredConstructor(AccountConstructor.class);
+            Constructor<? extends eu.locklogin.api.account.AccountManager> constructor = clazz.getDeclaredConstructor(AccountConstructor.class);
             constructor.setAccessible(true);
             return constructor.newInstance(parameter);
         } catch (Throwable ex) {
             try {
-                Constructor<? extends AccountManager> constructor = clazz.getConstructor(AccountConstructor.class);
+                Constructor<? extends eu.locklogin.api.account.AccountManager> constructor = clazz.getConstructor(AccountConstructor.class);
                 constructor.setAccessible(true);
                 return constructor.newInstance(parameter);
             } catch (Throwable exc) {
@@ -346,18 +347,18 @@ public final class CurrentPlatform {
      * @param parameters        the constructor parameter objects
      * @return the current account manager
      *
-     * @deprecated Deprecated as of 1.13.9, use {@link CurrentPlatform#getAccountManager(Manager, AccountConstructor)}
+     * @deprecated Deprecated as of 1.13.9, use {@link CurrentPlatform#getAccountManager(ManagerType, AccountConstructor)}
      */
     @Nullable
     @Deprecated
-    public static AccountManager getAccountManager(final Class<?>[] constructorParams, final Object... parameters) {
+    public static eu.locklogin.api.account.AccountManager getAccountManager(final Class<?>[] constructorParams, final Object... parameters) {
         try {
-            Constructor<? extends AccountManager> constructor = manager.getDeclaredConstructor(constructorParams);
+            Constructor<? extends eu.locklogin.api.account.AccountManager> constructor = manager.getDeclaredConstructor(constructorParams);
             constructor.setAccessible(true);
             return constructor.newInstance(parameters);
         } catch (Throwable ex) {
             try {
-                Constructor<? extends AccountManager> constructor = manager.getConstructor(constructorParams);
+                Constructor<? extends eu.locklogin.api.account.AccountManager> constructor = manager.getConstructor(constructorParams);
                 constructor.setAccessible(true);
                 return constructor.newInstance(parameters);
             } catch (Throwable exc) {
@@ -373,18 +374,18 @@ public final class CurrentPlatform {
      * @param parameters        the constructor parameter objects
      * @return the current account manager
      *
-     * @deprecated Deprecated as of 1.13.9, use {@link CurrentPlatform#getAccountManager(Manager, AccountConstructor)}
+     * @deprecated Deprecated as of 1.13.9, use {@link CurrentPlatform#getAccountManager(ManagerType, AccountConstructor)}
      */
     @Nullable
     @Deprecated
-    public static AccountManager getDefaultAccountManager(final Class<?>[] constructorParams, final Object... parameters) {
+    public static eu.locklogin.api.account.AccountManager getDefaultAccountManager(final Class<?>[] constructorParams, final Object... parameters) {
         try {
-            Constructor<? extends AccountManager> constructor = default_manager.getDeclaredConstructor(constructorParams);
+            Constructor<? extends eu.locklogin.api.account.AccountManager> constructor = default_manager.getDeclaredConstructor(constructorParams);
             constructor.setAccessible(true);
             return constructor.newInstance(parameters);
         } catch (Throwable ex) {
             try {
-                Constructor<? extends AccountManager> constructor = default_manager.getConstructor(constructorParams);
+                Constructor<? extends eu.locklogin.api.account.AccountManager> constructor = default_manager.getConstructor(constructorParams);
                 constructor.setAccessible(true);
                 return constructor.newInstance(parameters);
             } catch (Throwable exc) {
@@ -400,19 +401,19 @@ public final class CurrentPlatform {
      * @param parameters        the constructor parameter objects
      * @return the current account manager
      *
-     * @deprecated Deprecated as of 1.13.9, use {@link CurrentPlatform#getAccountManager(Manager, AccountConstructor)}
+     * @deprecated Deprecated as of 1.13.9, use {@link CurrentPlatform#getAccountManager(ManagerType, AccountConstructor)}
      */
     @Nullable
     @Deprecated
-    public static AccountManager getLastAccountManager(final Class<?>[] constructorParams, final Object... parameters) {
+    public static eu.locklogin.api.account.AccountManager getLastAccountManager(final Class<?>[] constructorParams, final Object... parameters) {
         if (last_manager != null) {
             try {
-                Constructor<? extends AccountManager> constructor = last_manager.getDeclaredConstructor(constructorParams);
+                Constructor<? extends eu.locklogin.api.account.AccountManager> constructor = last_manager.getDeclaredConstructor(constructorParams);
                 constructor.setAccessible(true);
                 return constructor.newInstance(parameters);
             } catch (Throwable ex) {
                 try {
-                    Constructor<? extends AccountManager> constructor = last_manager.getConstructor(constructorParams);
+                    Constructor<? extends eu.locklogin.api.account.AccountManager> constructor = last_manager.getConstructor(constructorParams);
                     constructor.setAccessible(true);
                     return constructor.newInstance(parameters);
                 } catch (Throwable exc) {
@@ -555,6 +556,7 @@ public final class CurrentPlatform {
      * @return the remote messaging server
      */
     @Nullable
+    @SuppressWarnings("unused")
     public static Object getRemoteServer() {
         return null;
     }

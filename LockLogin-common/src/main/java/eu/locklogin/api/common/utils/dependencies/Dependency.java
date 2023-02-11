@@ -15,7 +15,6 @@ package eu.locklogin.api.common.utils.dependencies;
  */
 
 import eu.locklogin.api.common.utils.FileInfo;
-import ml.karmaconfigs.api.common.utils.url.URLUtils;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -38,10 +37,6 @@ public enum Dependency {
      * LockLogin dependency
      */
     GUAVA,
-    /**
-     * LockLogin dependency
-     */
-    REMOTE,
     /**
      * LockLogin 1.7.10 dependency
      */
@@ -68,14 +63,13 @@ public enum Dependency {
                 return PluginDependency.of(prettyName(), FileInfo.repositoryHost(null, "Log4jWeb.jar"), true);
             case GUAVA:
                 return PluginDependency.of(prettyName(), FileInfo.repositoryHost(null, "Guava.jar"), true);
-            case REMOTE:
-                return PluginDependency.of(prettyName(), FileInfo.repositoryHost(null, "RemoteMessaging.jar"), true);
             case APACHE_COMMONS:
                 return PluginDependency.of(prettyName(), FileInfo.repositoryHost(null, "ApacheCommons.jar"), true);
-            case MANAGER:
+            /*case SOCKET_IO:
+                return PluginDependency.of(prettyName(), FileInfo.repositoryHost(null, "SocketIO.jar"), true);
+            */case MANAGER:
             default:
-                String version = FileInfo.getManagerVersion(null);
-                return PluginDependency.of(prettyName(), URLUtils.getOrNull("https://karmaconfigs.github.io/updates/LockLogin/modules/manager/" + version + "/LockLoginManager.jar"), true, true);
+                return PluginDependency.of(prettyName(), FileInfo.managerHost(null), true, true);
         }
     }
 
@@ -89,11 +83,11 @@ public enum Dependency {
                 return "Log4j Web";
             case GUAVA:
                 return "Google Guava";
-            case REMOTE:
-                return "Remote Messaging";
             case APACHE_COMMONS:
                 return "Apache Commons";
-            case MANAGER:
+            /*case SOCKET_IO:
+                return "Socket IO";
+            */case MANAGER:
             default:
                 return "LockLoginManager";
         }

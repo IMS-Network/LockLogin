@@ -15,23 +15,25 @@ package eu.locklogin.plugin.bungee.command;
  */
 
 import eu.locklogin.api.account.AccountID;
-import eu.locklogin.api.account.AccountManager;
-import eu.locklogin.api.common.session.PersistentSessionData;
+import eu.locklogin.api.common.session.persistence.PersistentSessionData;
+import eu.locklogin.api.common.utils.Channel;
 import eu.locklogin.api.common.utils.DataType;
 import eu.locklogin.api.common.utils.InstantParser;
 import eu.locklogin.api.common.utils.other.LockedAccount;
 import eu.locklogin.api.common.utils.other.name.AccountNameDatabase;
 import eu.locklogin.api.file.PluginMessages;
-import eu.locklogin.api.file.plugin.Alias;
+import eu.locklogin.api.file.pack.Alias;
 import eu.locklogin.api.module.plugin.client.permission.plugin.PluginPermissions;
-import eu.locklogin.api.util.enums.Manager;
+import eu.locklogin.api.util.enums.ManagerType;
 import eu.locklogin.api.util.platform.CurrentPlatform;
+import eu.locklogin.plugin.bungee.BungeeSender;
+import eu.locklogin.plugin.bungee.com.message.DataMessage;
 import eu.locklogin.plugin.bungee.command.util.SystemCommand;
+import eu.locklogin.plugin.bungee.plugin.Manager;
 import eu.locklogin.plugin.bungee.plugin.sender.AccountParser;
-import eu.locklogin.plugin.bungee.plugin.sender.DataSender;
 import eu.locklogin.plugin.bungee.util.files.client.OfflineClient;
 import eu.locklogin.plugin.bungee.util.player.User;
-import ml.karmaconfigs.api.common.utils.string.StringUtils;
+import ml.karmaconfigs.api.common.string.StringUtils;
 import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.CommandSender;
 import net.md_5.bungee.api.chat.TextComponent;
@@ -45,6 +47,7 @@ import java.util.*;
 import static eu.locklogin.plugin.bungee.LockLogin.*;
 
 @SystemCommand(command = "playerinfo")
+@SuppressWarnings("unused")
 public final class PlayerInfoCommand extends Command {
 
     /**
@@ -70,7 +73,7 @@ public final class PlayerInfoCommand extends Command {
             ProxiedPlayer player = (ProxiedPlayer) sender;
             User user = new User(player);
 
-            Set<AccountManager> accounts = new HashSet<>();
+            Set<eu.locklogin.api.account.AccountManager> accounts = new HashSet<>();
             int sent = 0;
             int max = 0;
 
@@ -94,21 +97,26 @@ public final class PlayerInfoCommand extends Command {
                                                 Set<AccountID> ids = alias.getUsers();
                                                 for (AccountID id : ids) {
                                                     OfflineClient offline = new OfflineClient(id);
-                                                    AccountManager manager = offline.getAccount();
+                                                    eu.locklogin.api.account.AccountManager manager = offline.getAccount();
 
                                                     if (manager != null)
                                                         accounts.add(manager);
                                                 }
 
-                                                for (AccountManager account : accounts) {
+                                                for (eu.locklogin.api.account.AccountManager account : accounts) {
                                                     player.sendMessage(ChatMessageType.ACTION_BAR, TextComponent.fromLegacyText(StringUtils.toColor("&aSending player accounts ( " + sent + " of " + max + " )")));
 
-                                                    DataSender.send(player, DataSender.getBuilder(DataType.PLAYER, DataSender.PLUGIN_CHANNEL, player).addTextData(StringUtils.serialize(account)).build());
+                                                    Manager.sendFunction.apply(DataMessage.newInstance(DataType.PLAYER, Channel.PLUGIN, player)
+                                                            .addProperty("account", StringUtils.serialize(account))
+                                                            .getInstance(),
+                                                            BungeeSender.serverFromPlayer(player));
                                                     sent++;
                                                 }
 
                                                 AccountParser parser = new AccountParser(accounts);
-                                                DataSender.send(player, DataSender.getBuilder(DataType.INFOGUI, DataSender.PLUGIN_CHANNEL, player).addTextData(parser.toString()).build());
+                                                Manager.sendFunction.apply(DataMessage.newInstance(DataType.INFOGUI, Channel.PLUGIN, player)
+                                                        .addProperty("player_info", parser.toString())
+                                                        .getInstance(), BungeeSender.serverFromPlayer(player));
                                             } else {
                                                 user.send(messages.prefix() + messages.aliasNotFound(name));
                                             }
@@ -118,31 +126,43 @@ public final class PlayerInfoCommand extends Command {
                                             switch (name) {
                                                 case "everyone":
                                                     for (ProxiedPlayer online : plugin.getProxy().getPlayers()) {
-                                                        AccountManager manager = CurrentPlatform.getAccountManager(Manager.CUSTOM, AccountID.fromUUID(online.getUniqueId()));
+                                                        eu.locklogin.api.account.AccountManager manager = CurrentPlatform.getAccountManager(ManagerType.CUSTOM, AccountID.fromUUID(online.getUniqueId()));
                                                         if (manager != null)
                                                             accounts.add(manager);
                                                     }
 
-                                                    for (AccountManager account : accounts) {
+                                                    for (eu.locklogin.api.account.AccountManager account : accounts) {
                                                         player.sendMessage(ChatMessageType.ACTION_BAR, TextComponent.fromLegacyText(StringUtils.toColor("&aSending player accounts ( " + sent + " of " + max + " )")));
 
-                                                        DataSender.send(player, DataSender.getBuilder(DataType.PLAYER, DataSender.PLUGIN_CHANNEL, player).addTextData(StringUtils.serialize(account)).build());
+                                                        Manager.sendFunction.apply(DataMessage.newInstance(DataType.PLAYER, Channel.PLUGIN, player)
+                                                                .addProperty("account", StringUtils.serialize(account))
+                                                                .getInstance(),
+                                                                BungeeSender.serverFromPlayer(player));
                                                         sent++;
                                                     }
 
                                                     parser = new AccountParser(accounts);
-                                                    DataSender.send(player, DataSender.getBuilder(DataType.INFOGUI, DataSender.PLUGIN_CHANNEL, player).addTextData(parser.toString()).build());
+                                                    Manager.sendFunction.apply(DataMessage.newInstance(DataType.INFOGUI, Channel.PLUGIN, player)
+                                                            .addProperty("player_info", parser.toString())
+                                                            .getInstance(),
+                                                            BungeeSender.serverFromPlayer(player));
                                                 case "persistent":
                                                     accounts = PersistentSessionData.getPersistentAccounts();
-                                                    for (AccountManager account : accounts) {
+                                                    for (eu.locklogin.api.account.AccountManager account : accounts) {
                                                         player.sendMessage(ChatMessageType.ACTION_BAR, TextComponent.fromLegacyText(StringUtils.toColor("&aSending player accounts ( " + sent + " of " + max + " )")));
 
-                                                        DataSender.send(player, DataSender.getBuilder(DataType.PLAYER, DataSender.PLUGIN_CHANNEL, player).addTextData(StringUtils.serialize(account)).build());
+                                                        Manager.sendFunction.apply(DataMessage.newInstance(DataType.PLAYER, Channel.PLUGIN, player)
+                                                                .addProperty("account", StringUtils.serialize(account))
+                                                                .getInstance(),
+                                                                BungeeSender.serverFromPlayer(player));
                                                         sent++;
                                                     }
 
                                                     parser = new AccountParser(accounts);
-                                                    DataSender.send(player, DataSender.getBuilder(DataType.INFOGUI, DataSender.PLUGIN_CHANNEL, player).addTextData(parser.toString()).build());
+                                                    Manager.sendFunction.apply(DataMessage.newInstance(DataType.INFOGUI, Channel.PLUGIN, player)
+                                                            .addProperty("player_info", parser.toString())
+                                                            .getInstance(),
+                                                            BungeeSender.serverFromPlayer(player));
                                                     break;
                                                 default:
                                                     String permission = StringUtils.replaceLast(name.replaceFirst("permission\\[", ""), "]", "");
@@ -150,21 +170,27 @@ public final class PlayerInfoCommand extends Command {
                                                     for (ProxiedPlayer online : plugin.getProxy().getPlayers()) {
                                                         if (online.hasPermission(permission)) {
 
-                                                            AccountManager manager = CurrentPlatform.getAccountManager(Manager.CUSTOM, AccountID.fromUUID(online.getUniqueId()));
+                                                            eu.locklogin.api.account.AccountManager manager = CurrentPlatform.getAccountManager(ManagerType.CUSTOM, AccountID.fromUUID(online.getUniqueId()));
                                                             if (manager != null)
                                                                 accounts.add(manager);
                                                         }
                                                     }
 
-                                                    for (AccountManager account : accounts) {
+                                                    for (eu.locklogin.api.account.AccountManager account : accounts) {
                                                         player.sendMessage(ChatMessageType.ACTION_BAR, TextComponent.fromLegacyText(StringUtils.toColor("&aSending player accounts ( " + sent + " of " + max + " )")));
 
-                                                        DataSender.send(player, DataSender.getBuilder(DataType.PLAYER, DataSender.PLUGIN_CHANNEL, player).addTextData(StringUtils.serialize(account)).build());
+                                                        Manager.sendFunction.apply(DataMessage.newInstance(DataType.PLAYER, Channel.PLUGIN, player)
+                                                                .addProperty("account", StringUtils.serialize(account))
+                                                                .getInstance(),
+                                                                BungeeSender.serverFromPlayer(player));
                                                         sent++;
                                                     }
 
                                                     parser = new AccountParser(accounts);
-                                                    DataSender.send(player, DataSender.getBuilder(DataType.INFOGUI, DataSender.PLUGIN_CHANNEL, player).addTextData(parser.toString()).build());
+                                                    Manager.sendFunction.apply(DataMessage.newInstance(DataType.INFOGUI, Channel.PLUGIN, player)
+                                                            .addProperty("player_info", parser.toString())
+                                                            .getInstance(),
+                                                            BungeeSender.serverFromPlayer(player));
                                                     break;
                                             }
                                         }
@@ -179,15 +205,21 @@ public final class PlayerInfoCommand extends Command {
                                                 accounts.add(conUser.getManager());
                                             }
 
-                                            for (AccountManager account : accounts) {
+                                            for (eu.locklogin.api.account.AccountManager account : accounts) {
                                                 player.sendMessage(ChatMessageType.ACTION_BAR, TextComponent.fromLegacyText(StringUtils.toColor("&aSending player accounts ( " + sent + " of " + max + " )")));
 
-                                                DataSender.send(player, DataSender.getBuilder(DataType.PLAYER, DataSender.PLUGIN_CHANNEL, player).addTextData(StringUtils.serialize(account)).build());
+                                                Manager.sendFunction.apply(DataMessage.newInstance(DataType.PLAYER, Channel.PLUGIN, player)
+                                                        .addProperty("account", StringUtils.serialize(account))
+                                                        .getInstance(),
+                                                        BungeeSender.serverFromPlayer(player));
                                                 sent++;
                                             }
 
                                             AccountParser parser = new AccountParser(accounts);
-                                            DataSender.send(player, DataSender.getBuilder(DataType.INFOGUI, DataSender.PLUGIN_CHANNEL, player).addTextData(parser.toString()).build());
+                                            Manager.sendFunction.apply(DataMessage.newInstance(DataType.INFOGUI, Channel.PLUGIN, player)
+                                                    .addProperty("player_info", parser.toString())
+                                                    .getInstance(),
+                                                    BungeeSender.serverFromPlayer(player));
                                         } else {
                                             user.send(messages.prefix() + messages.aliasNotFound(name));
                                         }
@@ -197,7 +229,7 @@ public final class PlayerInfoCommand extends Command {
                                 AccountNameDatabase.find(target).whenComplete((nsr) -> {
                                     if (nsr.singleResult()) {
                                         OfflineClient offline = new OfflineClient(target);
-                                        AccountManager manager = offline.getAccount();
+                                        eu.locklogin.api.account.AccountManager manager = offline.getAccount();
 
                                         if (manager != null) {
                                             AccountID id = manager.getUUID();
@@ -248,22 +280,28 @@ public final class PlayerInfoCommand extends Command {
                         default:
                             for (String name : args) {
                                 OfflineClient offline = new OfflineClient(name);
-                                AccountManager manager = offline.getAccount();
+                                eu.locklogin.api.account.AccountManager manager = offline.getAccount();
 
                                 if (manager != null) {
                                     accounts.add(manager);
                                 }
                             }
 
-                            for (AccountManager account : accounts) {
+                            for (eu.locklogin.api.account.AccountManager account : accounts) {
                                 player.sendMessage(ChatMessageType.ACTION_BAR, TextComponent.fromLegacyText(StringUtils.toColor("&aSending player accounts ( " + sent + " of " + max + " )")));
 
-                                DataSender.send(player, DataSender.getBuilder(DataType.PLAYER, DataSender.PLUGIN_CHANNEL, player).addTextData(StringUtils.serialize(account)).build());
+                                Manager.sendFunction.apply(DataMessage.newInstance(DataType.PLAYER, Channel.PLUGIN, player)
+                                        .addProperty("account", StringUtils.serialize(account))
+                                        .getInstance(),
+                                        BungeeSender.serverFromPlayer(player));
                                 sent++;
                             }
 
                             AccountParser parser = new AccountParser(accounts);
-                            DataSender.send(player, DataSender.getBuilder(DataType.INFOGUI, DataSender.PLUGIN_CHANNEL, player).addTextData(parser.toString()).build());
+                            Manager.sendFunction.apply(DataMessage.newInstance(DataType.INFOGUI, Channel.PLUGIN, player)
+                                    .addProperty("player_info", parser.toString())
+                                    .getInstance(),
+                                    BungeeSender.serverFromPlayer(player));
                             break;
                     }
                 } else {
